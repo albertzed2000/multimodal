@@ -21,8 +21,9 @@ Avoid: bosses, dragons, alternate-life regret framing, therapy-speak, diagnosis,
 2. Normalize either one `conversations.json` array or multiple `conversations-###.json` shard arrays.
 3. Extract only user-authored text messages from each conversation `mapping`.
 4. Build a representative corpus from early, spaced middle, and recent messages.
-5. Ask OpenAI for the required Pathfinder profile JSON shape.
-6. Fall back to a mock profile when `OPENAI_API_KEY` is not present, so frontend work is never blocked.
+5. Summarize chronological chunks with Gemini.
+6. Ask Gemini to synthesize the final Pathfinder profile JSON from chunk summaries.
+7. Fall back to a mock profile when `GEMINI_API_KEY` is not present, so frontend work is never blocked.
 7. Store the latest profile in `localStorage` and render it as a cheerful companion dashboard.
 
 ## Inspected Export Structure
@@ -62,13 +63,14 @@ The parser in `src/lib/pathfinder.ts`:
 
 ## Chunking Strategy
 
-For 1,000+ conversations, the MVP does not run multi-pass summarization. It samples up to 240 user messages:
+For 1,000+ conversations, the backend now runs a two-pass pipeline:
 
-- 20% earliest messages for origin signals
-- 35% spaced middle messages for recurring themes
-- 45% most recent messages for current ambitions
+- Sort extracted user messages chronologically.
+- Group all messages into chunks capped around 300 messages or 32,000 formatted characters.
+- Ask Gemini to summarize each chunk into recurring interests, active projects, goals, strengths, open loops, tone, quest seeds, and memorable signals.
+- Ask Gemini for a final synthesis over the chunk summaries.
 
-Each message is capped at 1,200 characters, and the final corpus is capped at 90,000 characters. This is intentionally fast and good enough for a demo. A production version should summarize per shard, then synthesize summaries into the final profile.
+Each individual message is capped at 1,200 characters before chunking. This keeps processing fast while avoiding the earlier MVP behavior of analyzing only a small sample.
 
 ## Project Structure
 
@@ -76,7 +78,7 @@ Each message is capped at 1,200 characters, and the final corpus is capped at 90
 src/app/page.tsx              Upload, loading, and dashboard UI
 src/app/layout.tsx            App shell and font setup
 src/app/globals.css           Global theme styles
-src/app/api/analyze/route.ts  Analyze endpoint and OpenAI call
+src/app/api/analyze/route.ts  Analyze endpoint and Gemini summarization pipeline
 src/lib/pathfinder.ts         Shared schema, parser, chunking, fallback profile
 docs/pathfinder-mvp.md        Handoff notes
 ```
@@ -129,8 +131,10 @@ Response:
     "conversations": 0,
     "messages": 0,
     "sampledMessages": 0,
+    "chunkCount": 0,
+    "summarizedMessages": 0,
     "estimatedCharacters": 0
   },
-  "source": "openai"
+  "source": "gemini"
 }
 ```

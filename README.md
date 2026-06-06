@@ -11,13 +11,13 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-The app works without an API key using mock profile data. To enable OpenAI analysis:
+The app works without an API key using mock profile data. To enable Gemini analysis with a Google AI Studio key:
 
 ```bash
 cp .env.example .env.local
 ```
 
-Then set `OPENAI_API_KEY`.
+Then set `GEMINI_API_KEY`.
 
 ## MVP
 

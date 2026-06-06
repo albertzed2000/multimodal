@@ -18,21 +18,18 @@ import type { PathfinderProfile, ParseStats } from "@/lib/pathfinder";
 type AnalyzeResponse = {
   profile: PathfinderProfile;
   stats: ParseStats;
-  source: "openai" | "mock" | "mock-after-error";
+  source: "gemini" | "mock" | "mock-after-error";
   error?: string;
 };
 
 const storageKey = "pathfinder.profile.v1";
 
 export default function Home() {
-  const saved = loadSavedProfile();
   const [files, setFiles] = useState<File[]>([]);
-  const [profile, setProfile] = useState<PathfinderProfile | null>(saved?.profile ?? null);
-  const [stats, setStats] = useState<ParseStats | null>(saved?.stats ?? null);
-  const [source, setSource] = useState<AnalyzeResponse["source"] | null>(saved?.source ?? null);
-  const [status, setStatus] = useState<"upload" | "loading" | "world">(
-    saved?.profile ? "world" : "upload",
-  );
+  const [profile, setProfile] = useState<PathfinderProfile | null>(null);
+  const [stats, setStats] = useState<ParseStats | null>(null);
+  const [source, setSource] = useState<AnalyzeResponse["source"] | null>(null);
+  const [status, setStatus] = useState<"upload" | "loading" | "world">("upload");
   const [error, setError] = useState<string | null>(null);
 
   const fileLabel = useMemo(() => {
@@ -247,8 +244,8 @@ function WorldScreen({
 
           <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
             <Stat label="Messages" value={stats?.messages ?? 0} />
-            <Stat label="Sampled" value={stats?.sampledMessages ?? 0} />
-            <Stat label="Mode" value={source === "openai" ? "AI" : "Mock"} />
+            <Stat label="Chunks" value={stats?.chunkCount ?? 0} />
+            <Stat label="Mode" value={source === "gemini" ? "Gemini" : "Mock"} />
           </dl>
         </aside>
 
@@ -366,22 +363,4 @@ function Panel({
 async function readJsonFile(file: File) {
   const text = await file.text();
   return JSON.parse(text);
-}
-
-function loadSavedProfile() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const saved = window.localStorage.getItem(storageKey);
-  if (!saved) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(saved) as AnalyzeResponse;
-  } catch {
-    window.localStorage.removeItem(storageKey);
-    return null;
-  }
 }

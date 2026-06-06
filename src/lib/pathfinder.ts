@@ -22,6 +22,25 @@ export type ParsedMessage = {
   text: string;
 };
 
+export const ConversationChunkSummarySchema = z.object({
+  label: z.string(),
+  timeRange: z.string(),
+  recurringInterests: z.array(z.string()),
+  activeProjects: z.array(z.string()),
+  goalsAndAspirations: z.array(z.string()),
+  strengths: z.array(z.string()),
+  openLoops: z.array(z.string()),
+  emotionalTone: z.array(z.string()),
+  questSeeds: z.array(z.string()),
+  memorableSignals: z.array(z.string()),
+});
+
+export const ConversationChunkSummariesSchema = z.object({
+  summaries: z.array(ConversationChunkSummarySchema),
+});
+
+export type ConversationChunkSummary = z.infer<typeof ConversationChunkSummarySchema>;
+
 type ExportConversation = {
   title?: unknown;
   create_time?: unknown;
@@ -49,7 +68,17 @@ export type ParseStats = {
   conversations: number;
   messages: number;
   sampledMessages: number;
+  chunkCount: number;
+  summarizedMessages: number;
   estimatedCharacters: number;
+};
+
+export type ConversationChunk = {
+  index: number;
+  label: string;
+  timeRange: string;
+  messages: ParsedMessage[];
+  characterCount: number;
 };
 
 export function normalizeConversationPayload(input: unknown): ExportConversation[] {
@@ -111,8 +140,65 @@ export function buildAnalysisCorpus(messages: ParsedMessage[], conversationCount
       conversations: conversationCount ?? new Set(messages.map((message) => message.conversationTitle)).size,
       messages: messages.length,
       sampledMessages: sample.length,
+      chunkCount: 1,
+      summarizedMessages: sample.length,
       estimatedCharacters: messages.reduce((total, message) => total + message.text.length, 0),
     } satisfies ParseStats,
+  };
+}
+
+export function buildConversationChunks(
+  messages: ParsedMessage[],
+  options: { maxMessages?: number; maxCharacters?: number } = {},
+) {
+  const maxMessages = options.maxMessages ?? 300;
+  const maxCharacters = options.maxCharacters ?? 32_000;
+  const chunks: ConversationChunk[] = [];
+  let current: ParsedMessage[] = [];
+  let currentCharacters = 0;
+
+  for (const message of messages) {
+    const nextCharacters = formatMessageForAnalysis(message, current.length).length;
+    const shouldFlush =
+      current.length > 0 &&
+      (current.length >= maxMessages || currentCharacters + nextCharacters > maxCharacters);
+
+    if (shouldFlush) {
+      chunks.push(createChunk(chunks.length, current, currentCharacters));
+      current = [];
+      currentCharacters = 0;
+    }
+
+    current.push(message);
+    currentCharacters += nextCharacters;
+  }
+
+  if (current.length) {
+    chunks.push(createChunk(chunks.length, current, currentCharacters));
+  }
+
+  return chunks;
+}
+
+export function buildChunkCorpus(chunk: ConversationChunk) {
+  return chunk.messages
+    .map((message, index) => formatMessageForAnalysis(message, index))
+    .join("\n")
+    .slice(0, 36_000);
+}
+
+export function buildParseStats(
+  conversations: number,
+  messages: ParsedMessage[],
+  chunks: ConversationChunk[],
+): ParseStats {
+  return {
+    conversations,
+    messages: messages.length,
+    sampledMessages: messages.length,
+    chunkCount: chunks.length,
+    summarizedMessages: chunks.reduce((total, chunk) => total + chunk.messages.length, 0),
+    estimatedCharacters: messages.reduce((total, message) => total + message.text.length, 0),
   };
 }
 
@@ -195,6 +281,28 @@ function contentToText(content: MessageContent | undefined) {
 
 function cleanMessage(text: string) {
   return text.replace(/\s+/g, " ").trim().slice(0, 1_200);
+}
+
+function createChunk(index: number, messages: ParsedMessage[], characterCount: number): ConversationChunk {
+  const first = messages[0]?.createTime;
+  const last = messages[messages.length - 1]?.createTime;
+  const start = first ? new Date(first * 1000).toISOString().slice(0, 10) : "unknown";
+  const end = last ? new Date(last * 1000).toISOString().slice(0, 10) : "unknown";
+
+  return {
+    index,
+    label: `Chunk ${index + 1}`,
+    timeRange: `${start} to ${end}`,
+    messages,
+    characterCount,
+  };
+}
+
+function formatMessageForAnalysis(message: ParsedMessage, index: number) {
+  const date = message.createTime
+    ? new Date(message.createTime * 1000).toISOString().slice(0, 10)
+    : "unknown-date";
+  return `${index + 1}. [${date}] ${message.conversationTitle}: ${message.text}`;
 }
 
 function representativeSample(messages: ParsedMessage[], maxMessages: number) {
