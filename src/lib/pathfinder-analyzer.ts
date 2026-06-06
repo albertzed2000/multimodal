@@ -238,6 +238,7 @@ Product direction:
 
 Rules:
 - Return only the structured JSON object.
+- Use casual, simple wording. No jargon. No mystical labels.
 - Quests must be real-world actions doable in 1-7 days.
 - Strengths should be concrete behaviors, not generic compliments.
 - Unfinished business should feel like friendly next chapters, not criticism.
@@ -245,8 +246,13 @@ Rules:
 - Companion should be cute, symbolic, and tied to small wins.
 - world.destinations must contain exactly 4 items.
 - The first 3 destinations must have type "interest" and represent the user's top 3 interests from the summaries.
+- Destination titles must be plain and specific, 2-4 words, preferably gerund phrases like "starting a restaurant", "building AI tools", "fitness habits", or "writing online".
+- Do not use abstract nouns or weird labels like "venture", "forge", "cove", "harbor", "island", "realm", "quest", "innovation", or fantasy names.
 - The fourth destination must have id "discovery", title "Discovery Pond", and type "discovery".
 - Each destination must include an iconHint, a matching single emoji, a profile-specific observation, exactly 3 suggestedTasks, and at least 5 backupTasks.
+- Observations should be 1 short sentence under 22 words.
+- Task titles should be direct, 2-6 words.
+- Task descriptions should be casual and under 14 words.
 - Task IDs must be stable lowercase slugs prefixed with the destination id, for example "interest-1-ship-demo".
 - mainTasks and completedTasks should start empty for a newly generated profile.
 - Avoid fantasy combat language, bosses, dragons, alternate-life regret framing, diagnosis, and therapy-speak.
@@ -301,9 +307,11 @@ ${JSON.stringify({
 Rules:
 - Return only JSON.
 - Tasks must be doable in 1-7 days.
+- Task titles should be direct, 2-6 words.
+- Task descriptions should be casual and under 14 words.
 - Use IDs prefixed with "${destination.id}-".
 - Do not repeat existing suggested, backup, main, or completed tasks.
-- Keep them practical, specific, and encouraging.`,
+- Keep them practical, specific, and plainspoken.`,
   });
 
   const parsed = parseJsonText(text) as { tasks?: PathfinderTask[] };
@@ -347,6 +355,9 @@ ${JSON.stringify(completedTask, null, 2)}
 Rules:
 - Return the full updated profile JSON.
 - Preserve the same top-level profile shape and world shape.
+- Keep wording short, casual, and easy to scan.
+- Keep destination titles plain and specific, 2-4 words.
+- Keep task titles direct, 2-6 words, and descriptions under 14 words.
 - Add the completed task to world.completedTasks.
 - Remove it from world.mainTasks if present.
 - Add a concise completion note.
