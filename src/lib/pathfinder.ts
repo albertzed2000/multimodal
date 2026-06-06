@@ -3,10 +3,8 @@ import { z } from "zod";
 export const PathfinderProfileSchema = z.object({
   archetype: z.string(),
   summary: z.string(),
-  alternateLives: z.array(z.string()),
   strengths: z.array(z.string()),
   unfinishedBusiness: z.array(z.string()),
-  dragons: z.array(z.string()),
   destinyThreads: z.array(z.string()),
   reflections: z.array(z.string()),
   quests: z.array(z.string()),
@@ -122,7 +120,6 @@ export function fallbackProfile(messages: ParsedMessage[]): PathfinderProfile {
   const joined = messages.map((message) => message.text.toLowerCase()).join(" ");
   const hasStartup = /startup|founder|product|hackathon|saas|launch|company/.test(joined);
   const hasCode = /code|typescript|next|react|api|database|python|engineering/.test(joined);
-  const hasLife = /life|career|habit|goal|coach|journal|relationship|health/.test(joined);
 
   return {
     archetype: hasStartup
@@ -131,26 +128,16 @@ export function fallbackProfile(messages: ParsedMessage[]): PathfinderProfile {
         ? "The Technical Cartographer"
         : "The Reflective Strategist",
     summary:
-      "Your conversations show a bias toward turning ambiguity into usable systems. You repeatedly use AI as a thinking partner for decisions, projects, self-improvement, and execution.",
-    alternateLives: [
-      hasStartup ? "Founder of a focused AI workflow studio" : "Independent product strategist",
-      hasCode ? "Builder of developer tools and internal platforms" : "Operator of a highly personal knowledge practice",
-      hasLife ? "Coach who translates reflection into concrete rituals" : "Researcher mapping complex domains for others",
-    ],
+      "Your conversations show a bias toward turning ambiguity into usable systems. You repeatedly use AI as a thinking partner for decisions, projects, self-improvement, and execution — and that's worth celebrating.",
     strengths: [
       "You break vague ambitions into named projects and concrete next actions.",
       "You move fluidly between strategy, implementation, and storytelling.",
       "You ask for structure when speed matters, which is a strong execution pattern.",
     ],
     unfinishedBusiness: [
-      "Ship smaller versions sooner instead of waiting for the full system to be elegant.",
-      "Protect time for follow-through after the initial planning surge.",
-      "Choose one active quest at a time when multiple interests compete.",
-    ],
-    dragons: [
-      "Scope drift disguised as vision.",
-      "Over-researching when a rough prototype would teach faster.",
-      "Letting useful personal data remain unstructured.",
+      "Ship a smaller version sooner — a rough demo still counts as progress.",
+      "Protect a little follow-through time after the initial planning surge.",
+      "Pick one active quest when multiple interests compete for attention.",
     ],
     destinyThreads: [
       "Build tools that convert personal history into actionable guidance.",
@@ -160,21 +147,21 @@ export function fallbackProfile(messages: ParsedMessage[]): PathfinderProfile {
     reflections: [
       "You often return to the same question: how can intelligence become a practical companion?",
       "Your best ideas sit at the border of self-knowledge, product design, and automation.",
-      "The world you are building should reward completion, not just insight.",
+      "The world you're building should reward completion, not just insight — and you're already on your way.",
     ],
     quests: [
       "Pick one neglected project and define the smallest public demo you can ship in 48 hours.",
-      "Write a one-page operating manual for how you want AI to coach you this month.",
-      "Schedule one real conversation with someone who represents an alternate life path.",
+      "Write a one-page note on how you want AI to cheer you on this month.",
+      "Schedule one real conversation with someone whose path inspires you.",
       "Turn three recurring ChatGPT prompts into reusable templates.",
-      "Complete one task today that makes tomorrow's version of you trust your systems more.",
+      "Complete one small task today that makes tomorrow's version of you smile.",
     ],
     companion: {
       baseType: "Compass Fox",
       evolutionItems: [
-        "Signal Lantern: earned by shipping a prototype.",
-        "Thread Cloak: earned by connecting two old interests into one project.",
-        "Dragon Scale: earned by finishing an avoided task.",
+        "Signal Lantern: for shipping a prototype.",
+        "Thread Cloak: for connecting two old interests into one project.",
+        "Star Sticker: for finishing something you've been putting off.",
       ],
     },
   };

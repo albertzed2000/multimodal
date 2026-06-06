@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Compass,
   FileJson,
-  Flame,
   Map,
   RefreshCcw,
   Shield,
@@ -114,14 +113,15 @@ export default function Home() {
           <div className="max-w-2xl">
             <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#2a9d8f]/40 bg-[#2a9d8f]/12 px-3 py-1 text-sm text-[#9be3d9]">
               <Sparkles className="size-4" />
-              Chat history becomes a quest map
+              Your chat history, turned into cheer
             </p>
             <h1 className="text-5xl font-semibold leading-[1.02] md:text-7xl">
-              Enter the map hidden in your conversations.
+              See the good stuff hiding in your conversations.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-white/68">
-              Upload a ChatGPT export and Pathfinder turns recurring interests, open loops,
-              strengths, and ambitions into a playable world.
+              Upload a ChatGPT export and Pathfinder turns your recurring interests, strengths,
+              and next steps into a cute, uplifting dashboard with a companion and small wins to
+              chase.
             </p>
           </div>
 
@@ -160,7 +160,7 @@ export default function Home() {
               onClick={analyze}
               disabled={!files.length}
             >
-              Generate World
+              Generate Dashboard
               <ArrowRight className="size-5" />
             </button>
           </div>
@@ -169,7 +169,7 @@ export default function Home() {
         <div className="grid gap-3 text-sm text-white/55 md:grid-cols-3">
           <p>1. Parse user-authored messages from ChatGPT mappings.</p>
           <p>2. Compress large exports into representative analysis chunks.</p>
-          <p>3. Render the AI profile as a companion, map nodes, and quests.</p>
+          <p>3. Render an encouraging profile with companion, sparkles, and quests.</p>
         </div>
       </section>
     </main>
@@ -183,10 +183,10 @@ function LoadingScreen({ count }: { count: number }) {
         <div className="mx-auto grid size-16 animate-pulse place-items-center rounded-lg bg-[#2a9d8f] text-black">
           <Map className="size-8" />
         </div>
-        <h1 className="mt-6 text-3xl font-semibold">Charting your world</h1>
+        <h1 className="mt-6 text-3xl font-semibold">Building your dashboard</h1>
         <p className="mt-3 text-white/62">
-          Reading {count} export file{count === 1 ? "" : "s"}, extracting signal, and building
-          your first quest board.
+          Reading {count} export file{count === 1 ? "" : "s"}, finding your highlights, and lining
+          up a few cheerful next steps.
         </p>
         <div className="mt-8 h-2 overflow-hidden rounded-full bg-white/10">
           <div className="h-full w-2/3 animate-[pulse_1.5s_ease-in-out_infinite] rounded-full bg-[#e9c46a]" />
@@ -255,11 +255,11 @@ function WorldScreen({
         <section className="min-h-[720px] rounded-lg border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))] p-5">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm uppercase tracking-[0.22em] text-white/48">World Map</p>
-              <h2 className="mt-1 text-2xl font-semibold">Reflection Nodes</h2>
+              <p className="text-sm uppercase tracking-[0.22em] text-white/48">Sparkle Board</p>
+              <h2 className="mt-1 text-2xl font-semibold">Things worth celebrating</h2>
             </div>
             <div className="rounded-full border border-white/12 px-3 py-1 text-sm text-white/58">
-              {profile.reflections.length} discoveries
+              {profile.reflections.length} highlights
             </div>
           </div>
 
@@ -269,10 +269,8 @@ function WorldScreen({
               {profile.reflections.map((reflection, index) => (
                 <MapNode key={reflection} index={index} text={reflection} />
               ))}
-              <Panel title="Hidden Strengths" icon={<Sparkles className="size-4" />} items={profile.strengths} />
-              <Panel title="Alternate Lives" icon={<Compass className="size-4" />} items={profile.alternateLives} />
+              <Panel title="Your Strengths" icon={<Sparkles className="size-4" />} items={profile.strengths} />
               <Panel title="Destiny Threads" icon={<Trophy className="size-4" />} items={profile.destinyThreads} />
-              <Panel title="Dragons" icon={<Flame className="size-4" />} items={profile.dragons} />
             </div>
           </div>
         </section>
@@ -284,7 +282,7 @@ function WorldScreen({
             </div>
             <div>
               <p className="text-sm uppercase tracking-[0.22em] text-[#f4a261]">Quest Panel</p>
-              <h2 className="text-xl font-semibold">Real-world quests</h2>
+              <h2 className="text-xl font-semibold">Small wins to try</h2>
             </div>
           </div>
 
@@ -304,7 +302,7 @@ function WorldScreen({
           </div>
 
           <div className="mt-5">
-            <Panel title="Unfinished Business" icon={<FileJson className="size-4" />} items={profile.unfinishedBusiness} />
+            <Panel title="Gentle Nudges" icon={<FileJson className="size-4" />} items={profile.unfinishedBusiness} />
           </div>
         </aside>
       </section>
@@ -332,7 +330,7 @@ function MapNode({ index, text }: { index: number; text: string }) {
         >
           {index + 1}
         </span>
-        <h3 className="font-semibold">Reflection Node</h3>
+        <h3 className="font-semibold">Highlight</h3>
       </div>
       <p className="mt-3 text-sm leading-6 text-white/66">{text}</p>
     </article>

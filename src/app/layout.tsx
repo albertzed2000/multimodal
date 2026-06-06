@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Pathfinder",
-  description: "Turn ChatGPT history into a personal quest map.",
+  description: "Turn ChatGPT history into an uplifting personal dashboard.",
 };
 
 export default function RootLayout({

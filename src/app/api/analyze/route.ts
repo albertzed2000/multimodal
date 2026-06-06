@@ -16,10 +16,8 @@ const profileJsonSchema = {
   required: [
     "archetype",
     "summary",
-    "alternateLives",
     "strengths",
     "unfinishedBusiness",
-    "dragons",
     "destinyThreads",
     "reflections",
     "quests",
@@ -28,10 +26,8 @@ const profileJsonSchema = {
   properties: {
     archetype: { type: "string" },
     summary: { type: "string" },
-    alternateLives: { type: "array", items: { type: "string" } },
     strengths: { type: "array", items: { type: "string" } },
     unfinishedBusiness: { type: "array", items: { type: "string" } },
-    dragons: { type: "array", items: { type: "string" } },
     destinyThreads: { type: "array", items: { type: "string" } },
     reflections: { type: "array", items: { type: "string" } },
     quests: { type: "array", items: { type: "string" } },
@@ -81,11 +77,11 @@ export async function POST(request: NextRequest) {
           {
             role: "system",
             content:
-              "You are Pathfinder, a perceptive but grounded AI life coach. Analyze ChatGPT user-message history and return only valid JSON. Make insights specific, meaningful, kind, and action-oriented. Avoid therapy, diagnosis, and generic personality-test language.",
+              "You are Pathfinder, an uplifting and playful AI cheerleader. Analyze ChatGPT user-message history and return only valid JSON. Make insights specific, warm, kind, and action-oriented. Celebrate strengths, frame open loops gently, and keep the tone cute and motivating — never combat-themed, never boss-battle flavored, and never diagnostic.",
           },
           {
             role: "user",
-            content: `Create a playable life-quest profile from these ChatGPT user messages.\n\nRules:\n- Output concise strings; no markdown.\n- Quests must be real-world, doable in 1-7 days, and aligned with recurring interests.\n- Dragons are obstacles or avoidance patterns, phrased with game flavor but practical meaning.\n- Reflections should feel like world nodes the user can discover.\n- Companion should be symbolic and evolve through quest completion.\n\nMessages:\n${corpus}`,
+            content: `Create an encouraging personal dashboard profile from these ChatGPT user messages.\n\nRules:\n- Output concise strings; no markdown.\n- Quests must be real-world, doable in 1-7 days, and aligned with recurring interests.\n- Unfinished business should feel like friendly next chapters, not criticism.\n- Reflections should feel like delightful discoveries the user can revisit.\n- Companion should be cute, symbolic, and tied to small wins.\n- Avoid fantasy combat language, bosses, dragons, or alternate-life regret framing.\n\nMessages:\n${corpus}`,
           },
         ],
         text: {

@@ -1,6 +1,6 @@
 # Pathfinder
 
-Hackathon MVP for turning ChatGPT conversation exports into a gamified personal quest map.
+Hackathon MVP for turning ChatGPT conversation exports into an uplifting, cute, and motivating personal dashboard.
 
 ## Run locally
 
@@ -24,7 +24,7 @@ Then set `OPENAI_API_KEY`.
 - Upload one `conversations.json` file or multiple `conversations-###.json` shards
 - Parse user-authored ChatGPT messages
 - Generate a Pathfinder profile
-- Render archetype, companion, reflection nodes, destiny threads, dragons, and quests
+- Render archetype, companion, sparkle board, destiny threads, gentle nudges, and quests
 - Store the latest profile in browser `localStorage`
 
 See `docs/pathfinder-mvp.md` for parsing and chunking details.
