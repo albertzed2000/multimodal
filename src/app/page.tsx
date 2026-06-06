@@ -17,9 +17,42 @@ import type { PathfinderProfile, ParseStats } from "@/lib/pathfinder";
 
 type AnalyzeResponse = {
   profile: PathfinderProfile;
+  profileId?: string;
   stats: ParseStats;
   source: "gemini" | "mock" | "mock-after-error";
   error?: string;
+};
+
+type JobProgress = {
+  phase: "parsing" | "summarizing" | "synthesizing" | "persisting" | "complete";
+  message: string;
+  completedChunks: number;
+  totalChunks: number;
+};
+
+type StartResponse = {
+  jobId: string;
+  statusUrl: string;
+  status: "queued" | "running" | "complete" | "error";
+  progress: JobProgress;
+  stats: ParseStats;
+  error?: string;
+};
+
+type StatusResponse = {
+  jobId: string;
+  status: "queued" | "running" | "complete" | "error";
+  progress: JobProgress;
+  stats?: ParseStats;
+  profileId?: string;
+  source?: AnalyzeResponse["source"];
+  error?: string;
+  details?: string;
+};
+
+type SavedProfileResponse = AnalyzeResponse & {
+  profileId: string;
+  createdAt: string;
 };
 
 const storageKey = "pathfinder.profile.v1";
@@ -29,6 +62,8 @@ export default function Home() {
   const [profile, setProfile] = useState<PathfinderProfile | null>(null);
   const [stats, setStats] = useState<ParseStats | null>(null);
   const [source, setSource] = useState<AnalyzeResponse["source"] | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState<JobProgress | null>(null);
   const [status, setStatus] = useState<"upload" | "loading" | "world">("upload");
   const [error, setError] = useState<string | null>(null);
 
@@ -51,21 +86,26 @@ export default function Home() {
 
     try {
       const payloads = await Promise.all(files.map(readJsonFile));
-      const response = await fetch("/api/analyze", {
+      const response = await fetch("/api/analyze/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversations: payloads }),
       });
-      const data = (await response.json()) as AnalyzeResponse;
+      const data = (await response.json()) as StartResponse;
 
-      if (!response.ok && !data.profile) {
+      if (!response.ok || !data.jobId) {
         throw new Error(data.error ?? "Analysis failed.");
       }
 
-      window.localStorage.setItem(storageKey, JSON.stringify(data));
-      setProfile(data.profile);
       setStats(data.stats);
-      setSource(data.source);
+      setLoadingProgress(data.progress);
+      const saved = await pollAnalysisJob(data.jobId, setLoadingProgress);
+
+      window.localStorage.setItem(storageKey, JSON.stringify(saved));
+      setProfile(saved.profile);
+      setProfileId(saved.profileId);
+      setStats(saved.stats);
+      setSource(saved.source);
       setStatus("world");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not read export files.");
@@ -78,17 +118,27 @@ export default function Home() {
     setProfile(null);
     setStats(null);
     setSource(null);
+    setProfileId(null);
+    setLoadingProgress(null);
     setFiles([]);
     setStatus("upload");
     setError(null);
   }
 
   if (status === "loading") {
-    return <LoadingScreen count={files.length} />;
+    return <LoadingScreen count={files.length} progress={loadingProgress} />;
   }
 
   if (status === "world" && profile) {
-    return <WorldScreen profile={profile} stats={stats} source={source} onReset={reset} />;
+    return (
+      <WorldScreen
+        profile={profile}
+        profileId={profileId}
+        stats={stats}
+        source={source}
+        onReset={reset}
+      />
+    );
   }
 
   return (
@@ -173,7 +223,12 @@ export default function Home() {
   );
 }
 
-function LoadingScreen({ count }: { count: number }) {
+function LoadingScreen({ count, progress }: { count: number; progress: JobProgress | null }) {
+  const totalChunks = progress?.totalChunks ?? 0;
+  const completedChunks = progress?.completedChunks ?? 0;
+  const percent =
+    totalChunks > 0 ? Math.max(8, Math.round((completedChunks / totalChunks) * 100)) : 28;
+
   return (
     <main className="grid min-h-screen place-items-center px-5">
       <section className="w-full max-w-xl rounded-lg border border-white/12 bg-black/35 p-8 text-center">
@@ -182,11 +237,19 @@ function LoadingScreen({ count }: { count: number }) {
         </div>
         <h1 className="mt-6 text-3xl font-semibold">Building your dashboard</h1>
         <p className="mt-3 text-white/62">
-          Reading {count} export file{count === 1 ? "" : "s"}, finding your highlights, and lining
-          up a few cheerful next steps.
+          {progress?.message ??
+            `Reading ${count} export file${count === 1 ? "" : "s"} and preparing your analysis.`}
         </p>
+        {totalChunks > 0 ? (
+          <p className="mt-3 font-mono text-sm text-white/45">
+            {completedChunks}/{totalChunks} chunks · {progress?.phase}
+          </p>
+        ) : null}
         <div className="mt-8 h-2 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full w-2/3 animate-[pulse_1.5s_ease-in-out_infinite] rounded-full bg-[#e9c46a]" />
+          <div
+            className="h-full rounded-full bg-[#e9c46a] transition-all duration-500"
+            style={{ width: `${percent}%` }}
+          />
         </div>
       </section>
     </main>
@@ -195,11 +258,13 @@ function LoadingScreen({ count }: { count: number }) {
 
 function WorldScreen({
   profile,
+  profileId,
   stats,
   source,
   onReset,
 }: {
   profile: PathfinderProfile;
+  profileId: string | null;
   stats: ParseStats | null;
   source: AnalyzeResponse["source"] | null;
   onReset: () => void;
@@ -222,6 +287,11 @@ function WorldScreen({
             </button>
           </div>
           <p className="mt-5 leading-7 text-white/66">{profile.summary}</p>
+          {profileId ? (
+            <p className="mt-4 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-xs text-white/48">
+              Profile ID: {profileId}
+            </p>
+          ) : null}
 
           <div className="mt-6 rounded-md border border-[#2a9d8f]/35 bg-[#2a9d8f]/10 p-4">
             <div className="flex items-center gap-3">
@@ -363,4 +433,40 @@ function Panel({
 async function readJsonFile(file: File) {
   const text = await file.text();
   return JSON.parse(text);
+}
+
+async function pollAnalysisJob(
+  jobId: string,
+  onProgress: (progress: JobProgress) => void,
+): Promise<SavedProfileResponse> {
+  for (let attempt = 0; attempt < 360; attempt += 1) {
+    await wait(1200);
+    const statusResponse = await fetch(`/api/analyze/status/${jobId}`);
+    const job = (await statusResponse.json()) as StatusResponse;
+
+    if (!statusResponse.ok) {
+      throw new Error(job.error ?? "Could not read analysis status.");
+    }
+
+    onProgress(job.progress);
+
+    if (job.status === "error") {
+      throw new Error(job.details ?? job.error ?? "Analysis job failed.");
+    }
+
+    if (job.status === "complete" && job.profileId) {
+      const profileResponse = await fetch(`/api/profile/${job.profileId}`);
+      const saved = (await profileResponse.json()) as SavedProfileResponse;
+      if (!profileResponse.ok) {
+        throw new Error(saved.error ?? "Could not load saved profile.");
+      }
+      return saved;
+    }
+  }
+
+  throw new Error("Analysis timed out.");
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

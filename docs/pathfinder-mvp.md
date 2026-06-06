@@ -100,6 +100,8 @@ Each profile section maps to a supportive UI area:
 
 ## API Contract
 
+### Start Async Analysis
+
 Request:
 
 ```json
@@ -114,6 +116,45 @@ Response:
 
 ```json
 {
+  "jobId": "",
+  "statusUrl": "/api/analyze/status/{jobId}",
+  "status": "queued",
+  "progress": {
+    "phase": "parsing",
+    "message": "",
+    "completedChunks": 0,
+    "totalChunks": 0
+  }
+}
+```
+
+Poll:
+
+```txt
+GET /api/analyze/status/{jobId}
+```
+
+When complete, the status response includes:
+
+```json
+{
+  "status": "complete",
+  "profileId": "",
+  "profileUrl": "/api/profile/{profileId}"
+}
+```
+
+Fetch saved profile:
+
+```txt
+GET /api/profile/{profileId}
+```
+
+Saved profile response:
+
+```json
+{
+  "profileId": "",
   "profile": {
     "archetype": "",
     "summary": "",
@@ -138,3 +179,16 @@ Response:
   "source": "gemini"
 }
 ```
+
+`POST /api/analyze` still exists as a synchronous compatibility endpoint and also saves a profile.
+
+## Local Persistence
+
+Generated job and profile JSON files are stored under `.pathfinder/`:
+
+```txt
+.pathfinder/jobs/{jobId}.json
+.pathfinder/profiles/{profileId}.json
+```
+
+`.pathfinder/` is ignored by git.
