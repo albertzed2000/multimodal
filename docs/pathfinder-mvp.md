@@ -66,9 +66,10 @@ The parser in `src/lib/pathfinder.ts`:
 For 1,000+ conversations, the backend now runs a two-pass pipeline:
 
 - Sort extracted user messages chronologically.
-- Group all messages into chunks capped around 300 messages or 32,000 formatted characters.
+- Group all messages into chunks capped around 400 messages or 45,000 formatted characters.
 - Ask Gemini to summarize each chunk into recurring interests, active projects, goals, strengths, open loops, tone, quest seeds, and memorable signals.
 - Ask Gemini for a final synthesis over the chunk summaries.
+- Chunk summaries run with concurrency 5 and retry transient Gemini errors with backoff.
 
 Each individual message is capped at 1,200 characters before chunking. This keeps processing fast while avoiding the earlier MVP behavior of analyzing only a small sample.
 

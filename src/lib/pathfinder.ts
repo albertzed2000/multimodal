@@ -151,8 +151,8 @@ export function buildConversationChunks(
   messages: ParsedMessage[],
   options: { maxMessages?: number; maxCharacters?: number } = {},
 ) {
-  const maxMessages = options.maxMessages ?? 300;
-  const maxCharacters = options.maxCharacters ?? 32_000;
+  const maxMessages = options.maxMessages ?? 400;
+  const maxCharacters = options.maxCharacters ?? 45_000;
   const chunks: ConversationChunk[] = [];
   let current: ParsedMessage[] = [];
   let currentCharacters = 0;
@@ -184,7 +184,7 @@ export function buildChunkCorpus(chunk: ConversationChunk) {
   return chunk.messages
     .map((message, index) => formatMessageForAnalysis(message, index))
     .join("\n")
-    .slice(0, 36_000);
+    .slice(0, 48_000);
 }
 
 export function buildParseStats(

@@ -11,6 +11,8 @@ import {
 
 type JsonSchema = Record<string, unknown>;
 
+const chunkSummaryConcurrency = 5;
+
 export type AnalysisSource = "gemini" | "mock" | "mock-after-error";
 
 export type AnalyzeProgress = {
@@ -114,7 +116,7 @@ export async function analyzePathfinderProfile({
   });
 
   let completedChunks = 0;
-  const summaries = await runWithConcurrency(chunks, 3, async (chunk) => {
+  const summaries = await runWithConcurrency(chunks, chunkSummaryConcurrency, async (chunk) => {
     const summary = await summarizeChunkWithGemini(
       `${chunk.label} (${chunk.timeRange})`,
       buildChunkCorpus(chunk),
@@ -207,7 +209,7 @@ async function generateGeminiJson({
   prompt: string;
 }) {
   const model = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
-  const response = await fetch(
+  const response = await fetchWithRetry(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: "POST",
@@ -311,4 +313,39 @@ async function runWithConcurrency<T, R>(
   );
 
   return results;
+}
+
+async function fetchWithRetry(url: string, init: RequestInit) {
+  const maxAttempts = 3;
+  let lastDetails = "";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetch(url, init);
+
+    if (response.ok || !isRetryableStatus(response.status) || attempt === maxAttempts) {
+      return response;
+    }
+
+    lastDetails = await response.text();
+    await wait(backoffMs(attempt, response.headers.get("retry-after")));
+  }
+
+  throw new Error(`Gemini request failed after retries: ${lastDetails}`);
+}
+
+function isRetryableStatus(status: number) {
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function backoffMs(attempt: number, retryAfter: string | null) {
+  const retryAfterSeconds = retryAfter ? Number(retryAfter) : NaN;
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return retryAfterSeconds * 1000;
+  }
+
+  return 800 * 2 ** (attempt - 1) + Math.floor(Math.random() * 250);
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
