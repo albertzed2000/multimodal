@@ -135,7 +135,9 @@ function makeBadge(marker: GlobeMarker, onClickId: (id: string) => void) {
   const HEAD_CY = 19;
 
   const wrap = document.createElement("div");
-  wrap.style.cssText = `position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;user-select:none;`;
+  // globe.gl renders HTML markers on an overlay layer with pointer-events:none.
+  // Opt this marker back into hit-testing so clicks reach onClickId().
+  wrap.style.cssText = `position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;user-select:none;pointer-events:auto;`;
 
   // Always-visible label sitting above the pin.
   const tag = document.createElement("div");
@@ -337,9 +339,16 @@ export default function GlobeView({ markers, selectedId, onSelect }: Props) {
       const dy = sc.y - posRef.current.y;
       setClipRange(dy >= 0 ? CAT_CLIPS.frontWalk : CAT_CLIPS.backWalk);
       onArriveRef.current = () => {
-        setClipRange(CAT_CLIPS.idle);
+        // Play a short wave each time the cat reaches a destination.
+        setClipRange(CAT_CLIPS.wave);
         arrivedRef.current = true;
         onSelect(id);
+        window.setTimeout(() => {
+          // If we have started moving again, don't force-reset the clip.
+          if (!walkingRef.current) {
+            setClipRange(CAT_CLIPS.idle);
+          }
+        }, 1200);
       };
       walkingRef.current = true;
     },

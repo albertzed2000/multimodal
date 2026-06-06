@@ -179,7 +179,7 @@ export default function Home() {
             <div className="grid size-10 place-items-center rounded-2xl bg-[#7ecfbf] text-white shadow-md shadow-[#7ecfbf]/30">
               <Compass className="size-5" />
             </div>
-            <span className="text-lg font-bold tracking-wide text-[#3d3228]">Pathfinder</span>
+            <span className="text-lg font-bold tracking-wide text-[#3d3228]">Sprout</span>
           </div>
           <span className="rounded-full border-2 border-[#7ecfbf]/40 bg-white/70 px-3 py-1 text-sm font-medium text-[#7ecfbf]">
             ✨ Local MVP
@@ -197,7 +197,7 @@ export default function Home() {
               See the good stuff hiding in your conversations.
             </h1>
             <p className="mt-5 text-lg leading-8 text-[#7a6a5a]">
-              Upload a ChatGPT export and Pathfinder turns your recurring interests, strengths,
+              Upload a ChatGPT export and Sprout turns your recurring interests, strengths,
               and next steps into a cozy, uplifting world to explore 🌿
             </p>
           </div>
@@ -303,12 +303,20 @@ const ISLAND_POSITIONS: Array<{ lat: number; lng: number }> = [
   { lat: 48, lng: -18 },
   { lat: -14, lng: 9 },
   { lat: 6, lng: 40 },
-  { lat: -22, lng: -28 },
+  { lat: 10, lng: -28 },
 ];
 
 function buildIslands(profile: PathfinderProfile): GlobeMarker[] {
   const world = profile.world ?? buildFallbackWorld(profile);
-  return world.destinations.slice(0, 4).map((destination, i) => ({
+  const destinations = world.destinations ?? [];
+  const discovery = destinations.find((d) => d.id === "discovery");
+  const nonDiscovery = destinations.filter((d) => d.id !== "discovery");
+  const ordered =
+    discovery
+      ? [nonDiscovery[0], nonDiscovery[1], nonDiscovery[2], discovery].filter(Boolean)
+      : destinations.slice(0, 4);
+
+  return ordered.slice(0, 4).map((destination, i) => ({
     id: destination.id,
     lat: ISLAND_POSITIONS[i].lat,
     lng: ISLAND_POSITIONS[i].lng,
@@ -352,11 +360,13 @@ function WorldScreen({
 }) {
   const [currentProfile, setCurrentProfile] = useState<PathfinderProfile>(() => ensureProfileWorld(profile));
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showAllMainTasks, setShowAllMainTasks] = useState(false);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [taskError, setTaskError] = useState<string | null>(null);
 
   const world = currentProfile.world ?? buildFallbackWorld(currentProfile);
   const mainTasks = world.mainTasks;
+  const visibleMainTasks = showAllMainTasks ? mainTasks : mainTasks.slice(0, 3);
   const completedTasks = world.completedTasks;
   const islands = useMemo(() => buildIslands(currentProfile), [currentProfile]);
 
@@ -481,7 +491,7 @@ function WorldScreen({
           <div className="grid size-9 place-items-center rounded-2xl bg-[#7ecfbf] text-white shadow-md shadow-[#7ecfbf]/25">
             <Compass className="size-4" />
           </div>
-          <span className="font-bold text-[#3d3228]">Pathfinder</span>
+          <span className="font-bold text-[#3d3228]">Sprout</span>
           <span className="ml-1 rounded-full border-2 border-[#d4f2ec] bg-[#f0faf8] px-2.5 py-0.5 text-xs font-semibold text-[#5aab9b]">
             {currentProfile.archetype}
           </span>
@@ -498,43 +508,21 @@ function WorldScreen({
       {/* Main layout */}
       <div className="flex min-h-0 flex-1">
         {/* Left sidebar */}
-        <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r-2 border-[#d4f2ec] bg-white/50 p-5">
-          {/* Companion card */}
-          <div className="rounded-2xl border-2 border-[#b4ddd4] bg-[#d4f2ec] p-4">
-            <div className="flex items-center gap-3">
-              <div className="grid size-12 place-items-center rounded-2xl bg-[#7ecfbf] text-2xl shadow-md shadow-[#7ecfbf]/30">
-                🦊
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-[#5aab9b]">Companion</p>
-                <h2 className="font-bold text-[#3d3228]">{currentProfile.companion.baseType}</h2>
-              </div>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-[#5a6e68]">{currentProfile.summary}</p>
-          </div>
-
+        <aside className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r-2 border-[#d4f2ec] bg-white/50 p-5">
           <div className="rounded-2xl border-2 border-[#fde8d8] bg-[#fff8f4] p-4">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#d4805a]">
               <Swords className="size-3.5" /> Main Task List
             </p>
             <div className="space-y-2">
               {mainTasks.length ? (
-                mainTasks.map((task) => (
-                  <button
+                visibleMainTasks.map((task) => (
+                  <TaskTodoCard
                     key={task.id}
-                    className="flex w-full gap-2 rounded-xl border-2 border-[#fde8d8] bg-white/75 p-2 text-left text-sm leading-5 text-[#6a5a4a] transition hover:border-[#f4a07a] disabled:opacity-60"
-                    onClick={() => completeTask(task)}
-                    disabled={busyTaskId === task.id}
-                    title="Complete task"
-                  >
-                    <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded border border-[#7ecfbf] text-[10px] font-bold text-[#7ecfbf]">
-                      ✓
-                    </span>
-                    <span>
-                      <span className="block font-semibold text-[#3d3228]">{displayTaskTitle(task)}</span>
-                      <span className="line-clamp-2">{displayTaskDescription(task)}</span>
-                    </span>
-                  </button>
+                    task={task}
+                    busy={busyTaskId === task.id}
+                    onComplete={() => completeTask(task)}
+                    defaultExpanded
+                  />
                 ))
               ) : (
                 <p className="text-sm leading-5 text-[#7a6a5a]">
@@ -542,6 +530,14 @@ function WorldScreen({
                 </p>
               )}
             </div>
+            {mainTasks.length > 3 ? (
+              <button
+                onClick={() => setShowAllMainTasks((v) => !v)}
+                className="mt-2 rounded-xl border-2 border-[#f4a07a]/40 bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#a66445] transition hover:bg-white"
+              >
+                {showAllMainTasks ? "Show less" : `Show all ${mainTasks.length} tasks`}
+              </button>
+            ) : null}
           </div>
 
           {/* Strengths */}
@@ -659,7 +655,7 @@ function WorldScreen({
               </div>
               <div className="space-y-2">
                 {mainTasks.length ? (
-                  mainTasks.map((task) => (
+                  visibleMainTasks.map((task) => (
                     <TaskTodoCard
                       key={task.id}
                       task={task}
@@ -672,6 +668,14 @@ function WorldScreen({
                     Click a destination, then use + to add suggested tasks here.
                   </p>
                 )}
+                {mainTasks.length > 3 ? (
+                  <button
+                    onClick={() => setShowAllMainTasks((v) => !v)}
+                    className="rounded-xl border-2 border-[#f4a07a]/40 bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#a66445] transition hover:bg-white"
+                  >
+                    {showAllMainTasks ? "Show less" : `Show all ${mainTasks.length} tasks`}
+                  </button>
+                ) : null}
               </div>
 
               {completedTasks.length > 0 ? (
@@ -761,11 +765,17 @@ function TaskTodoCard({
   task,
   busy,
   onComplete,
+  defaultExpanded = false,
 }: {
   task: PathfinderTask;
   busy: boolean;
   onComplete: () => void;
+  defaultExpanded?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const canExpand =
+    displayTaskTitle(task).length > 72 || displayTaskDescription(task).length > 160;
+
   return (
     <article className="rounded-2xl border-2 border-[#fde8d8] bg-[#fff8f4] p-3">
       <div className="flex gap-3">
@@ -778,10 +788,27 @@ function TaskTodoCard({
         >
           ✓
         </button>
-        <span>
+        <span className="min-w-0 flex-1">
           <span className="block text-xs font-bold text-[#c4a060]">{task.category}</span>
-          <span className="block text-sm font-semibold leading-5 text-[#3d3228]">{displayTaskTitle(task)}</span>
-          <span className="mt-1 block text-sm leading-5 text-[#6a5a4a]">{displayTaskDescription(task)}</span>
+          <span
+            className={`block text-sm font-semibold leading-5 text-[#3d3228] ${expanded ? "whitespace-normal break-words" : "line-clamp-2"}`}
+          >
+            {displayTaskTitle(task)}
+          </span>
+          <span
+            className={`mt-1 block text-sm leading-5 text-[#6a5a4a] ${expanded ? "whitespace-normal break-words" : "line-clamp-2"}`}
+          >
+            {displayTaskDescription(task)}
+          </span>
+          {canExpand ? (
+            <button
+              type="button"
+              className="mt-1 text-xs font-semibold text-[#a66445] underline underline-offset-2"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? "Show less" : "Expand task"}
+            </button>
+          ) : null}
         </span>
       </div>
     </article>
@@ -857,20 +884,33 @@ function emojiForInterest(value: string) {
 
 function displayDestinationTitle(destination: PathfinderDestination) {
   if (destination.id === "discovery") return "Discovery Pond";
-  const raw = destination.title || destination.iconHint;
+  const raw = (destination.title || destination.iconHint || "").trim();
   const lower = raw.toLowerCase();
-  if (/restaurant|food|menu|cafe|dining/.test(lower)) return "starting a restaurant";
-  if (/ai|artificial intelligence|agent|automation/.test(lower) && /tool|app|product/.test(lower)) {
-    return "building AI tools";
+
+  // Prefer concise, specific topic labels.
+  if (/restaurant|food|menu|cafe|dining|kitchen/.test(lower)) return "Restaurant Planning";
+  if (/ai|artificial intelligence|agent|automation|llm|model/.test(lower)) {
+    if (/tool|app|product|platform|workflow/.test(lower)) return "AI Tool Building";
+    return "AI Projects";
   }
-  if (/running|run|marathon|jog/.test(lower)) return "running routine";
-  if (/fitness|workout|exercise|health/.test(lower)) return "fitness habits";
-  if (/writing|blog|newsletter|essay/.test(lower)) return "writing online";
+  if (/running|run|marathon|jog|mile/.test(lower)) return "Running";
+  if (/fitness|workout|exercise|strength|health/.test(lower)) return "Fitness";
+  if (/writing|blog|newsletter|essay|article|content/.test(lower)) return "Writing";
+  if (/startup|founder|business|company|venture/.test(lower)) return "Startup Work";
+  if (/design|brand|visual|ui|ux/.test(lower)) return "Design";
+  if (/learn|study|research|course|reading/.test(lower)) return "Learning";
+
   const cleaned = raw
-    .replace(/\b(venture|forge|cove|harbor|island|realm|quest|odyssey|sanctuary|kingdom|innovation)\b/gi, "")
+    .replace(
+      /\b(venture|forge|cove|harbor|island|realm|quest|odyssey|sanctuary|kingdom|innovation|lab|labs|hub|zone)\b/gi,
+      "",
+    )
+    .replace(/[^\w\s&/-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return shortWords(cleaned, 4).toLowerCase() || "new project";
+
+  const concise = trimTrailingStopWords(shortWords(cleaned, 3));
+  return toTitleCase(concise || "New Topic");
 }
 
 function displayTaskTitle(task: PathfinderTask) {
@@ -892,6 +932,42 @@ function shortWords(value: string, maxWords: number) {
     .split(/\s+/)
     .filter(Boolean);
   return words.slice(0, maxWords).join(" ");
+}
+
+function toTitleCase(value: string) {
+  return value
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function trimTrailingStopWords(value: string) {
+  const stop = new Set([
+    "and",
+    "or",
+    "the",
+    "a",
+    "an",
+    "to",
+    "of",
+    "for",
+    "with",
+    "in",
+    "on",
+    "at",
+    "by",
+    "from",
+    "into",
+    "about",
+    "vs",
+  ]);
+  const words = value.split(/\s+/).filter(Boolean);
+  while (words.length > 1 && stop.has(words[words.length - 1].toLowerCase())) {
+    words.pop();
+  }
+  return words.join(" ");
 }
 
 async function pollAnalysisJob(

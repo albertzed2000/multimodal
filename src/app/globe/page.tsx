@@ -12,7 +12,7 @@ const GlobeView = lazy(() => import("@/components/GlobeView"));
 const ISLANDS: GlobeMarker[] = [
   { id: "island-0", lat: 48, lng: -18, label: "Build tools", color: "#e9c46a", emoji: "🎨" },
   { id: "island-2", lat: 6, lng: 40, label: "AI & creativity", color: "#f4a261", emoji: "🌿" },
-  { id: "discovery", lat: -22, lng: -28, label: "Discovery Pond", color: "#8ab17d", emoji: "✨" },
+  { id: "discovery", lat: 10, lng: -28, label: "Discovery Pond", color: "#8ab17d", emoji: "✨" },
   { id: "island-1", lat: -14, lng: 9, label: "Reflection systems", color: "#2a9d8f", emoji: "🧭" },
 ];
 
