@@ -1,0 +1,18 @@
+.next/
+node_modules/
+out/
+dist/
+*.log
+.env*
+!.env.example
+
+# ChatGPT export artifacts: private and large.
+chat.html
+conversations*.json
+conversation_asset_file_names.json
+export_manifest.json
+library_files.json
+shared_conversations.json
+user.json
+user_settings.json
+file*.dat

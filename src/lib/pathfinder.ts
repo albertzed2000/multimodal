@@ -1,0 +1,226 @@
+import { z } from "zod";
+
+export const PathfinderProfileSchema = z.object({
+  archetype: z.string(),
+  summary: z.string(),
+  alternateLives: z.array(z.string()),
+  strengths: z.array(z.string()),
+  unfinishedBusiness: z.array(z.string()),
+  dragons: z.array(z.string()),
+  destinyThreads: z.array(z.string()),
+  reflections: z.array(z.string()),
+  quests: z.array(z.string()),
+  companion: z.object({
+    baseType: z.string(),
+    evolutionItems: z.array(z.string()),
+  }),
+});
+
+export type PathfinderProfile = z.infer<typeof PathfinderProfileSchema>;
+
+export type ParsedMessage = {
+  conversationTitle: string;
+  createTime?: number;
+  text: string;
+};
+
+type ExportConversation = {
+  title?: unknown;
+  create_time?: unknown;
+  mapping?: Record<
+    string,
+    {
+      message?: {
+        author?: { role?: unknown };
+        content?: {
+          parts?: unknown;
+          text?: unknown;
+        };
+        create_time?: unknown;
+      } | null;
+    }
+  >;
+};
+
+type MessageContent = {
+  parts?: unknown;
+  text?: unknown;
+};
+
+export type ParseStats = {
+  conversations: number;
+  messages: number;
+  sampledMessages: number;
+  estimatedCharacters: number;
+};
+
+export function normalizeConversationPayload(input: unknown): ExportConversation[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  const maybeShards = input.every((item) => Array.isArray(item));
+  const rows = maybeShards ? input.flat() : input;
+  return rows.filter((item): item is ExportConversation => Boolean(item && typeof item === "object"));
+}
+
+export function extractUserMessages(conversations: ExportConversation[]): ParsedMessage[] {
+  const messages: ParsedMessage[] = [];
+
+  for (const conversation of conversations) {
+    const title = typeof conversation.title === "string" ? conversation.title : "Untitled";
+    const createTime =
+      typeof conversation.create_time === "number" ? conversation.create_time : undefined;
+
+    if (!conversation.mapping || typeof conversation.mapping !== "object") {
+      continue;
+    }
+
+    for (const node of Object.values(conversation.mapping)) {
+      const message = node.message;
+      if (!message || message.author?.role !== "user") {
+        continue;
+      }
+
+      const text = contentToText(message.content);
+      const cleaned = cleanMessage(text);
+      if (cleaned.length >= 8) {
+        messages.push({
+          conversationTitle: title,
+          createTime:
+            typeof message.create_time === "number" ? message.create_time : createTime,
+          text: cleaned,
+        });
+      }
+    }
+  }
+
+  return messages.sort((a, b) => (a.createTime ?? 0) - (b.createTime ?? 0));
+}
+
+export function buildAnalysisCorpus(messages: ParsedMessage[], conversationCount?: number) {
+  const sample = representativeSample(messages, 240);
+  const lines = sample.map((message, index) => {
+    const date = message.createTime
+      ? new Date(message.createTime * 1000).toISOString().slice(0, 10)
+      : "unknown-date";
+    return `${index + 1}. [${date}] ${message.conversationTitle}: ${message.text}`;
+  });
+
+  return {
+    corpus: lines.join("\n").slice(0, 90_000),
+    stats: {
+      conversations: conversationCount ?? new Set(messages.map((message) => message.conversationTitle)).size,
+      messages: messages.length,
+      sampledMessages: sample.length,
+      estimatedCharacters: messages.reduce((total, message) => total + message.text.length, 0),
+    } satisfies ParseStats,
+  };
+}
+
+export function fallbackProfile(messages: ParsedMessage[]): PathfinderProfile {
+  const joined = messages.map((message) => message.text.toLowerCase()).join(" ");
+  const hasStartup = /startup|founder|product|hackathon|saas|launch|company/.test(joined);
+  const hasCode = /code|typescript|next|react|api|database|python|engineering/.test(joined);
+  const hasLife = /life|career|habit|goal|coach|journal|relationship|health/.test(joined);
+
+  return {
+    archetype: hasStartup
+      ? "The Systems Builder"
+      : hasCode
+        ? "The Technical Cartographer"
+        : "The Reflective Strategist",
+    summary:
+      "Your conversations show a bias toward turning ambiguity into usable systems. You repeatedly use AI as a thinking partner for decisions, projects, self-improvement, and execution.",
+    alternateLives: [
+      hasStartup ? "Founder of a focused AI workflow studio" : "Independent product strategist",
+      hasCode ? "Builder of developer tools and internal platforms" : "Operator of a highly personal knowledge practice",
+      hasLife ? "Coach who translates reflection into concrete rituals" : "Researcher mapping complex domains for others",
+    ],
+    strengths: [
+      "You break vague ambitions into named projects and concrete next actions.",
+      "You move fluidly between strategy, implementation, and storytelling.",
+      "You ask for structure when speed matters, which is a strong execution pattern.",
+    ],
+    unfinishedBusiness: [
+      "Ship smaller versions sooner instead of waiting for the full system to be elegant.",
+      "Protect time for follow-through after the initial planning surge.",
+      "Choose one active quest at a time when multiple interests compete.",
+    ],
+    dragons: [
+      "Scope drift disguised as vision.",
+      "Over-researching when a rough prototype would teach faster.",
+      "Letting useful personal data remain unstructured.",
+    ],
+    destinyThreads: [
+      "Build tools that convert personal history into actionable guidance.",
+      "Create systems where reflection becomes momentum.",
+      "Use taste and technical fluency to make AI feel personal rather than generic.",
+    ],
+    reflections: [
+      "You often return to the same question: how can intelligence become a practical companion?",
+      "Your best ideas sit at the border of self-knowledge, product design, and automation.",
+      "The world you are building should reward completion, not just insight.",
+    ],
+    quests: [
+      "Pick one neglected project and define the smallest public demo you can ship in 48 hours.",
+      "Write a one-page operating manual for how you want AI to coach you this month.",
+      "Schedule one real conversation with someone who represents an alternate life path.",
+      "Turn three recurring ChatGPT prompts into reusable templates.",
+      "Complete one task today that makes tomorrow's version of you trust your systems more.",
+    ],
+    companion: {
+      baseType: "Compass Fox",
+      evolutionItems: [
+        "Signal Lantern: earned by shipping a prototype.",
+        "Thread Cloak: earned by connecting two old interests into one project.",
+        "Dragon Scale: earned by finishing an avoided task.",
+      ],
+    },
+  };
+}
+
+function contentToText(content: MessageContent | undefined) {
+  if (!content) {
+    return "";
+  }
+
+  if (typeof content.text === "string") {
+    return content.text;
+  }
+
+  if (Array.isArray(content.parts)) {
+    return content.parts
+      .map((part) => {
+        if (typeof part === "string") {
+          return part;
+        }
+        if (part && typeof part === "object" && "text" in part && typeof part.text === "string") {
+          return part.text;
+        }
+        return "";
+      })
+      .join("\n");
+  }
+
+  return "";
+}
+
+function cleanMessage(text: string) {
+  return text.replace(/\s+/g, " ").trim().slice(0, 1_200);
+}
+
+function representativeSample(messages: ParsedMessage[], maxMessages: number) {
+  if (messages.length <= maxMessages) {
+    return messages;
+  }
+
+  const recent = messages.slice(-Math.floor(maxMessages * 0.45));
+  const early = messages.slice(0, Math.floor(maxMessages * 0.2));
+  const middleBudget = maxMessages - recent.length - early.length;
+  const middle = messages.slice(early.length, -recent.length);
+  const step = Math.max(1, Math.floor(middle.length / middleBudget));
+  const sampledMiddle = middle.filter((_, index) => index % step === 0).slice(0, middleBudget);
+
+  return [...early, ...sampledMiddle, ...recent];
+}
