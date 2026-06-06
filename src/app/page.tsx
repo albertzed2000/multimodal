@@ -310,7 +310,7 @@ function buildIslands(profile: PathfinderProfile): GlobeMarker[] {
     id: destination.id,
     lat: ISLAND_POSITIONS[i].lat,
     lng: ISLAND_POSITIONS[i].lng,
-    label: destination.title,
+    label: displayDestinationTitle(destination),
     color: ISLAND_COLORS[i],
     emoji: destination.emoji || emojiForInterest(destination.iconHint),
   }));
@@ -566,8 +566,8 @@ function WorldScreen({
                       ✓
                     </span>
                     <span>
-                      <span className="block font-semibold text-[#3d3228]">{task.title}</span>
-                      <span className="line-clamp-2">{task.description}</span>
+                      <span className="block font-semibold text-[#3d3228]">{displayTaskTitle(task)}</span>
+                      <span className="line-clamp-2">{displayTaskDescription(task)}</span>
                     </span>
                   </button>
                 ))
@@ -637,7 +637,7 @@ function WorldScreen({
               {selectedIsland.marker.emoji} Destination
                   </p>
                   <h2 className="mt-1 text-xl font-bold leading-tight text-[#3d3228]">
-                    {selectedIsland.destination.title}
+                    {displayDestinationTitle(selectedIsland.destination)}
                   </h2>
                 </div>
                 <button
@@ -653,7 +653,7 @@ function WorldScreen({
                   Observation
                 </p>
                 <p className="text-sm leading-6 text-[#5a6e68]">
-                  {selectedIsland.destination.observation}
+                  {displayObservation(selectedIsland.destination.observation)}
                 </p>
               </div>
 
@@ -725,7 +725,7 @@ function WorldScreen({
                   </p>
                   {completedTasks.slice(-3).map((task) => (
                     <p key={task.id} className="mb-2 text-sm leading-5 text-[#5a6e68]">
-                      ✓ {task.title}
+                      ✓ {displayTaskTitle(task)}
                     </p>
                   ))}
                 </div>
@@ -774,8 +774,8 @@ function TaskSuggestionCard({
           <p className="text-xs font-bold uppercase tracking-widest text-[#c4a060]">
             {task.category}
           </p>
-          <h3 className="mt-1 text-sm font-bold text-[#3d3228]">{task.title}</h3>
-          <p className="mt-1 text-sm leading-5 text-[#6a5a4a]">{task.description}</p>
+          <h3 className="mt-1 text-sm font-bold text-[#3d3228]">{displayTaskTitle(task)}</h3>
+          <p className="mt-1 text-sm leading-5 text-[#6a5a4a]">{displayTaskDescription(task)}</p>
         </div>
         <div className="flex shrink-0 gap-1.5">
           <button
@@ -824,8 +824,8 @@ function TaskTodoCard({
         </button>
         <span>
           <span className="block text-xs font-bold text-[#c4a060]">{task.category}</span>
-          <span className="block text-sm font-semibold leading-5 text-[#3d3228]">{task.title}</span>
-          <span className="mt-1 block text-sm leading-5 text-[#6a5a4a]">{task.description}</span>
+          <span className="block text-sm font-semibold leading-5 text-[#3d3228]">{displayTaskTitle(task)}</span>
+          <span className="mt-1 block text-sm leading-5 text-[#6a5a4a]">{displayTaskDescription(task)}</span>
         </span>
       </div>
     </article>
@@ -897,6 +897,45 @@ function emojiForInterest(value: string) {
   if (/writing|story|content|journal/.test(lower)) return "✍️";
   if (/learn|research|study|knowledge/.test(lower)) return "📚";
   return "🧭";
+}
+
+function displayDestinationTitle(destination: PathfinderDestination) {
+  if (destination.id === "discovery") return "Discovery Pond";
+  const raw = destination.title || destination.iconHint;
+  const lower = raw.toLowerCase();
+  if (/restaurant|food|menu|cafe|dining/.test(lower)) return "starting a restaurant";
+  if (/ai|artificial intelligence|agent|automation/.test(lower) && /tool|app|product/.test(lower)) {
+    return "building AI tools";
+  }
+  if (/running|run|marathon|jog/.test(lower)) return "running routine";
+  if (/fitness|workout|exercise|health/.test(lower)) return "fitness habits";
+  if (/writing|blog|newsletter|essay/.test(lower)) return "writing online";
+  const cleaned = raw
+    .replace(/\b(venture|forge|cove|harbor|island|realm|quest|odyssey|sanctuary|kingdom|innovation)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return shortWords(cleaned, 4).toLowerCase() || "new project";
+}
+
+function displayTaskTitle(task: PathfinderTask) {
+  return shortWords(task.title || task.description, 6);
+}
+
+function displayTaskDescription(task: PathfinderTask) {
+  return shortWords(task.description || task.title, 14);
+}
+
+function displayObservation(value: string) {
+  return shortWords(value, 22);
+}
+
+function shortWords(value: string, maxWords: number) {
+  const words = value
+    .replace(/[“”]/g, "\"")
+    .replace(/[^\w\s,'"’-]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  return words.slice(0, maxWords).join(" ");
 }
 
 async function pollAnalysisJob(

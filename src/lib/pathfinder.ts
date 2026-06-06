@@ -290,9 +290,9 @@ export function fallbackProfile(messages: ParsedMessage[]): PathfinderProfile {
 
 export function buildFallbackWorld(profile: PathfinderProfile): PathfinderWorld {
   const titles = [
-    profile.destinyThreads[0] ? shortTitle(profile.destinyThreads[0]) : "Builder Tools",
-    profile.destinyThreads[1] ? shortTitle(profile.destinyThreads[1]) : "Reflection Systems",
-    profile.destinyThreads[2] ? shortTitle(profile.destinyThreads[2]) : "Creative AI",
+    profile.destinyThreads[0] ? simpleInterestTitle(profile.destinyThreads[0]) : "building tools",
+    profile.destinyThreads[1] ? simpleInterestTitle(profile.destinyThreads[1]) : "reflection systems",
+    profile.destinyThreads[2] ? simpleInterestTitle(profile.destinyThreads[2]) : "creative AI",
   ];
   const emojis = ["🛠️", "🧭", "✨"];
 
@@ -339,8 +339,8 @@ function makeFallbackTasks(items: string[], offset: number): PathfinderTask[] {
     const title = items[(index + offset) % Math.max(items.length, 1)] ?? fallback[index];
     return {
       id: `task-${offset}-${index}-${slugify(title).slice(0, 24)}`,
-      title: shortTitle(title),
-      description: title,
+      title: simpleTaskTitle(title),
+      description: shortSentence(title, 14),
       category: index === 1 ? "exploration" : "task",
       companionReward: "A small glow of momentum for your companion.",
     };
@@ -350,6 +350,20 @@ function makeFallbackTasks(items: string[], offset: number): PathfinderTask[] {
 function shortTitle(value: string) {
   const words = value.replace(/[^\w\s-]/g, "").split(/\s+/).filter(Boolean);
   return words.slice(0, 4).join(" ") || "Curiosity Trail";
+}
+
+function simpleInterestTitle(value: string) {
+  return shortTitle(value).toLowerCase() || "new project";
+}
+
+function simpleTaskTitle(value: string) {
+  const words = value.replace(/[^\w\s-]/g, "").split(/\s+/).filter(Boolean);
+  return words.slice(0, 5).join(" ") || "Try one step";
+}
+
+function shortSentence(value: string, maxWords: number) {
+  const words = value.split(/\s+/).filter(Boolean);
+  return words.slice(0, maxWords).join(" ");
 }
 
 function slugify(value: string) {
