@@ -3,6 +3,7 @@ node_modules/
 out/
 dist/
 *.log
+*.tsbuildinfo
 .pathfinder/
 .env*
 !.env.example
