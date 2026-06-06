@@ -19,6 +19,9 @@ cp .env.example .env.local
 
 Then set `GEMINI_API_KEY`.
 
+For teammates, share the real key out-of-band. Each person should keep it in their own
+`.env.local`; that file is ignored by git.
+
 ## MVP
 
 - Upload one `conversations.json` file or multiple `conversations-###.json` shards

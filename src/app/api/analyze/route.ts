@@ -18,7 +18,6 @@ type JsonSchema = Record<string, unknown>;
 
 const chunkSummaryJsonSchema = {
   type: "object",
-  additionalProperties: false,
   required: [
     "label",
     "timeRange",
@@ -47,7 +46,6 @@ const chunkSummaryJsonSchema = {
 
 const profileJsonSchema = {
   type: "object",
-  additionalProperties: false,
   required: [
     "archetype",
     "summary",
@@ -68,7 +66,6 @@ const profileJsonSchema = {
     quests: { type: "array", items: { type: "string" } },
     companion: {
       type: "object",
-      additionalProperties: false,
       required: ["baseType", "evolutionItems"],
       properties: {
         baseType: { type: "string" },
@@ -210,12 +207,8 @@ async function generateGeminiJson({
           },
         ],
         generationConfig: {
-          responseFormat: {
-            text: {
-              mimeType: "application/json",
-              schema,
-            },
-          },
+          responseMimeType: "application/json",
+          responseSchema: schema,
         },
       }),
     },
