@@ -5,52 +5,16 @@ import {
   SpriteAnimation,
   type SpriteAnimationHandle,
   type SpriteClips,
-  type SpriteRect,
 } from "@/components/SpriteAnimation";
+import { CAT_CLIPS, CAT_SHEET } from "@/lib/catSprite";
 
-// The bundled cat sheet is 1280x1280 with a 4x4 layout, but the frames are NOT
-// on an even grid — each figure sits at a slightly different x/y inside its
-// cell. These per-frame content centers were measured from the sheet so we can
-// crop a fixed 320px window centered on each one, keeping the character planted
-// instead of drifting between frames.
-const FRAME = 320;
-const SHEET_SIZE = 1280;
-const HALF = FRAME / 2;
-const MAX_ORIGIN = SHEET_SIZE - FRAME;
-
-// [centerX, centerY] of each frame, in row-major order.
-const FRAME_CENTERS: ReadonlyArray<readonly [number, number]> = [
-  [202, 190], [499, 190], [792, 190], [1084, 190], // row 1 — idle
-  [197, 480], [497, 479], [789, 479], [1075, 479], // row 2 — front walk
-  [196, 774], [491, 774], [786, 774], [1080, 774], // row 3 — back walk
-  [201, 1068], [494, 1068], [783, 1068], [1073, 1068], // row 4 — wave
-];
-
-const clamp = (v: number) => Math.max(0, Math.min(MAX_ORIGIN, v));
-
-const frameRects: SpriteRect[] = FRAME_CENTERS.map(([cx, cy]) => ({
-  x: clamp(cx - HALF),
-  y: clamp(cy - HALF),
-  width: FRAME,
-  height: FRAME,
-}));
-
-const SHEET = {
-  src: "/sprites.png",
-  columns: 4,
-  rows: 4,
-  frameWidth: FRAME,
-  frameHeight: FRAME,
-  sheetWidth: SHEET_SIZE,
-  sheetHeight: SHEET_SIZE,
-  frameRects,
-} as const;
+const SHEET = CAT_SHEET;
 
 const clips: SpriteClips = {
-  Idle: [0, 0],
-  "Front walk": [4, 7],
-  "Back walk": [8, 11],
-  Wave: [12, 15],
+  Idle: CAT_CLIPS.idle,
+  "Front walk": CAT_CLIPS.frontWalk,
+  "Back walk": CAT_CLIPS.backWalk,
+  Wave: CAT_CLIPS.wave,
 };
 
 export default function SpriteDemoPage() {

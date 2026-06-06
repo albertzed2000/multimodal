@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { SpriteAnimation } from "@/components/SpriteAnimation";
+import { CAT_CLIPS, CAT_SHEET } from "@/lib/catSprite";
 
 export type GlobeMarker = {
   id: string;
@@ -125,67 +127,83 @@ function buildGlobeTexture(): HTMLCanvasElement {
 }
 
 function makeBadge(marker: GlobeMarker, onClickId: (id: string) => void) {
-  const colors: Record<string, { bg: string; border: string; shadow: string }> = {
-    "island-0": { bg: "#fff7d6", border: "#f5c842", shadow: "#f5c84255" },
-    "island-1": { bg: "#d4f2ec", border: "#7ecfbf", shadow: "#7ecfbf55" },
-    "island-2": { bg: "#fde8d8", border: "#f4a07a", shadow: "#f4a07a55" },
-    "discovery": { bg: "#dff2d0", border: "#93c47d", shadow: "#93c47d55" },
-  };
-  const p = colors[marker.id] ?? colors["island-0"];
+  const color = marker.color;
+  const PIN_W = 40;
+  const PIN_H = 52;
 
   const wrap = document.createElement("div");
-  wrap.style.cssText = `display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;user-select:none;`;
+  wrap.style.cssText = `position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;user-select:none;`;
 
-  const bubble = document.createElement("div");
-  bubble.style.cssText = `
-    width: 58px; height: 58px; border-radius: 50%;
-    background: ${p.bg};
-    border: 3px solid ${p.border};
-    display: flex; align-items: center; justify-content: center;
-    font-size: 28px;
-    box-shadow: 0 4px 18px ${p.shadow}, 0 2px 6px rgba(0,0,0,0.08);
-    transition: transform 0.2s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s;
-  `;
-  bubble.textContent = marker.emoji;
+  // Location-pin shape (teardrop with a circular hole), tinted per node.
+  const pin = document.createElement("div");
+  pin.style.cssText = `position:relative;width:${PIN_W}px;height:${PIN_H}px;transform-origin:50% 100%;transition:transform 0.2s cubic-bezier(.34,1.56,.64,1);filter:drop-shadow(0 5px 5px rgba(40,40,70,0.32));`;
+  pin.innerHTML = `<svg width="${PIN_W}" height="${PIN_H}" viewBox="0 0 40 52" xmlns="http://www.w3.org/2000/svg">
+    <path d="M20 1 C9.5 1 1 9.5 1 19.5 C1 32.5 20 51 20 51 C20 51 39 32.5 39 19.5 C39 9.5 30.5 1 20 1 Z" fill="${color}" stroke="#ffffff" stroke-width="2.5"/>
+    <circle cx="20" cy="19" r="9" fill="#ffffff"/>
+  </svg>`;
 
+  // Emoji nestled in the pin head.
+  const emoji = document.createElement("div");
+  emoji.textContent = marker.emoji;
+  emoji.style.cssText = `position:absolute;top:8px;left:0;width:100%;text-align:center;font-size:15px;line-height:1;pointer-events:none;`;
+  pin.appendChild(emoji);
+
+  // Label hidden until hover.
   const tag = document.createElement("div");
   tag.style.cssText = `
-    background: white; border: 2.5px solid ${p.border}; border-radius: 20px;
-    padding: 3px 11px; font-size: 10.5px; font-weight: 700; color: #4a3f35;
-    white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    letter-spacing: 0.03em; font-family: system-ui, sans-serif;
+    position:absolute; top:${PIN_H + 4}px; left:50%;
+    transform:translateX(-50%) translateY(-4px); opacity:0;
+    transition:opacity 0.15s ease, transform 0.15s ease; pointer-events:none;
+    background:white; border:2.5px solid ${color}; border-radius:20px;
+    padding:3px 11px; font-size:10.5px; font-weight:700; color:#4a3f35;
+    white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,0.12);
+    letter-spacing:0.03em; font-family:system-ui, sans-serif;
   `;
   tag.textContent = marker.label;
 
-  wrap.appendChild(bubble);
+  wrap.appendChild(pin);
   wrap.appendChild(tag);
 
-  wrap.addEventListener("click", () => {
-    wrap.dispatchEvent(new CustomEvent("markerclick", { detail: marker.id, bubbles: true }));
-    void onClickId;
-  });
+  wrap.addEventListener("click", () => onClickId(marker.id));
   wrap.addEventListener("mouseenter", () => {
-    bubble.style.transform = "scale(1.2) translateY(-4px)";
-    bubble.style.boxShadow = `0 10px 28px ${p.shadow}, 0 2px 6px rgba(0,0,0,0.10)`;
+    pin.style.transform = "scale(1.18) translateY(-3px)";
+    tag.style.opacity = "1";
+    tag.style.transform = "translateX(-50%) translateY(0)";
   });
   wrap.addEventListener("mouseleave", () => {
-    bubble.style.transform = "scale(1)";
-    bubble.style.boxShadow = `0 4px 18px ${p.shadow}, 0 2px 6px rgba(0,0,0,0.08)`;
+    pin.style.transform = "scale(1)";
+    tag.style.opacity = "0";
+    tag.style.transform = "translateX(-50%) translateY(-4px)";
   });
 
   return wrap;
 }
 
+type Vec = { x: number; y: number };
+
+const MARKER_ALTITUDE = 0.04;
+
 export default function GlobeView({ markers, selectedId, onSelect }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
+  const spriteRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const globeRef = useRef<any>(null);
   const [ready, setReady] = useState(false);
+  const [clipRange, setClipRange] = useState<readonly [number, number]>(CAT_CLIPS.idle);
+
+  // Walk/animation state lives in refs so the rAF loop always reads fresh data.
+  const posRef = useRef<Vec | null>(null);
+  const targetRef = useRef<Vec | "center" | null>(null);
+  const walkingRef = useRef(false);
+  const onArriveRef = useRef<(() => void) | null>(null);
+  const arrivedRef = useRef(false);
+  const chooseRef = useRef<((id: string) => void) | null>(null);
 
   useEffect(() => {
     if (!mountRef.current || globeRef.current) return;
     let cancelled = false;
-    let animFrame: number;
+    let raf = 0;
+    let last = performance.now();
 
     (async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -227,11 +245,20 @@ export default function GlobeView({ markers, selectedId, onSelect }: Props) {
         .atmosphereAltitude(0.22)
         .showGraticules(false)
         .htmlElementsData(markers)
-        .htmlElement((d: unknown) => makeBadge(d as GlobeMarker, onSelect))
+        .htmlElement((d: unknown) =>
+          makeBadge(d as GlobeMarker, (id) => chooseRef.current?.(id)),
+        )
         .htmlLat((d: unknown) => (d as GlobeMarker).lat)
         .htmlLng((d: unknown) => (d as GlobeMarker).lng)
-        .htmlAltitude(0.04)
+        .htmlAltitude(MARKER_ALTITUDE)
         .pointOfView({ lat: 18, lng: 0, altitude: 2.2 }, 0);
+
+      // Keep the globe stationary so every node stays put and visible.
+      const controls = instance.controls();
+      controls.enableRotate = false;
+      controls.enableZoom = false;
+      controls.enablePan = false;
+      controls.autoRotate = false;
 
       // Warm pastel lighting
       const scene = instance.scene();
@@ -243,41 +270,132 @@ export default function GlobeView({ markers, selectedId, onSelect }: Props) {
       sun.position.set(4, 3, 2);
       scene.add(sun);
 
-      // Gentle auto-rotate
-      let lng = 0;
-      const go = () => {
-        lng += 0.07;
-        instance.pointOfView({ lat: 18, lng, altitude: 2.2 }, 0);
-        animFrame = requestAnimationFrame(go);
-      };
-      animFrame = requestAnimationFrame(go);
+      // Spawn the cat in the middle of the globe.
+      posRef.current = { x: el.clientWidth / 2, y: el.clientHeight / 2 };
+      if (spriteRef.current) {
+        spriteRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
+      }
 
-      globeRef.current = { instance, stopRotate: () => cancelAnimationFrame(animFrame) };
+      globeRef.current = { instance };
       setReady(true);
+
+      const loop = (now: number) => {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+
+        const pos = posRef.current;
+        if (pos) {
+          const center = { x: el.clientWidth / 2, y: el.clientHeight / 2 };
+          const raw = targetRef.current;
+          const tgt = raw === "center" ? center : raw;
+          if (walkingRef.current && tgt) {
+            const dx = tgt.x - pos.x;
+            const dy = tgt.y - pos.y;
+            const dist = Math.hypot(dx, dy);
+            const step = 260 * dt;
+            if (dist > step && dist > 1) {
+              pos.x += (dx / dist) * step;
+              pos.y += (dy / dist) * step;
+            } else {
+              pos.x = tgt.x;
+              pos.y = tgt.y;
+              walkingRef.current = false;
+              const cb = onArriveRef.current;
+              onArriveRef.current = null;
+              cb?.();
+            }
+          }
+          if (spriteRef.current) {
+            spriteRef.current.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+          }
+        }
+
+        raf = requestAnimationFrame(loop);
+      };
+      raf = requestAnimationFrame(loop);
     })();
 
     return () => {
       cancelled = true;
-      cancelAnimationFrame(animFrame!);
+      cancelAnimationFrame(raf);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Bubble clicks
+  // Send the cat walking toward a node. The globe is stationary and every node
+  // is on the visible hemisphere, so the target screen position is stable —
+  // just walk straight to it. Front walk heading down, back walk heading up.
+  const choose = useCallback(
+    (id: string) => {
+      const api = globeRef.current?.instance;
+      const marker = markers.find((m) => m.id === id);
+      if (!api || !marker || walkingRef.current || !posRef.current) return;
+
+      const sc = api.getScreenCoords(marker.lat, marker.lng, MARKER_ALTITUDE);
+      if (!sc) return;
+
+      arrivedRef.current = false;
+      targetRef.current = { x: sc.x, y: sc.y };
+      const dy = sc.y - posRef.current.y;
+      setClipRange(dy >= 0 ? CAT_CLIPS.frontWalk : CAT_CLIPS.backWalk);
+      onArriveRef.current = () => {
+        setClipRange(CAT_CLIPS.idle);
+        arrivedRef.current = true;
+        onSelect(id);
+      };
+      walkingRef.current = true;
+    },
+    [markers, onSelect],
+  );
+
+  // Keep the badge click handler pointed at the latest `choose`.
   useEffect(() => {
+    chooseRef.current = choose;
+  }, [choose]);
+
+  // When the panel is closed, walk the cat back to the middle and resume spin.
+  useEffect(() => {
+    if (!ready) return;
+    if (selectedId !== null || !arrivedRef.current) return;
+
     const el = mountRef.current;
-    if (!el) return;
-    const h = (e: Event) => onSelect((e as CustomEvent).detail as string);
-    el.addEventListener("markerclick", h);
-    return () => el.removeEventListener("markerclick", h);
-  }, [onSelect]);
+    if (!el || !posRef.current) return;
 
-  // Fly to selected
-  useEffect(() => {
-    if (!ready || !globeRef.current) return;
-    const m = markers.find((m) => m.id === selectedId);
-    if (m) globeRef.current.instance.pointOfView({ lat: m.lat, lng: m.lng, altitude: 1.7 }, 900);
-  }, [selectedId, ready, markers]);
+    arrivedRef.current = false;
+    const center = { x: el.clientWidth / 2, y: el.clientHeight / 2 };
+    const dy = center.y - posRef.current.y;
+    setClipRange(dy >= 0 ? CAT_CLIPS.frontWalk : CAT_CLIPS.backWalk);
+    targetRef.current = "center";
+    onArriveRef.current = () => {
+      setClipRange(CAT_CLIPS.idle);
+    };
+    walkingRef.current = true;
+  }, [selectedId, ready]);
 
-  return <div ref={mountRef} style={{ width: "100%", height: "100%" }} />;
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <div ref={mountRef} style={{ width: "100%", height: "100%" }} />
+
+      <div
+        ref={spriteRef}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          zIndex: 5,
+          pointerEvents: "none",
+          willChange: "transform",
+        }}
+      >
+        <div
+          style={{
+            transform: "translate(-50%, -100%)",
+            filter: "drop-shadow(0 8px 10px rgba(60,60,90,0.28))",
+          }}
+        >
+          <SpriteAnimation {...CAT_SHEET} frameRange={clipRange} fps={9} scale={0.34} />
+        </div>
+      </div>
+    </div>
+  );
 }

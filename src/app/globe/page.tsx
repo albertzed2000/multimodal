@@ -5,11 +5,15 @@ import type { GlobeMarker } from "@/components/GlobeView";
 
 const GlobeView = lazy(() => import("@/components/GlobeView"));
 
+// All four nodes sit on the front-facing hemisphere (camera looks at lat 18,
+// lng 0) so they stay visible on the stationary globe and the cat can walk
+// between them without anything popping in/out of view. Positions are
+// deliberately scattered (varied lat/lng) rather than laid out on a grid.
 const ISLANDS: GlobeMarker[] = [
-  { id: "island-0", lat: 35, lng: -30, label: "Build tools", color: "#e9c46a", emoji: "🎨" },
-  { id: "island-1", lat: -20, lng: 60, label: "Reflection systems", color: "#2a9d8f", emoji: "🧭" },
-  { id: "island-2", lat: 50, lng: 140, label: "AI & creativity", color: "#f4a261", emoji: "🌿" },
-  { id: "discovery", lat: -40, lng: -100, label: "Discovery Pond", color: "#8ab17d", emoji: "✨" },
+  { id: "island-0", lat: 51, lng: -19, label: "Build tools", color: "#e9c46a", emoji: "🎨" },
+  { id: "island-2", lat: 8, lng: 44, label: "AI & creativity", color: "#f4a261", emoji: "🌿" },
+  { id: "discovery", lat: -33, lng: -41, label: "Discovery Pond", color: "#8ab17d", emoji: "✨" },
+  { id: "island-1", lat: -12, lng: 11, label: "Reflection systems", color: "#2a9d8f", emoji: "🧭" },
 ];
 
 export default function GlobePage() {
@@ -39,9 +43,6 @@ export default function GlobePage() {
         </div>
       )}
 
-      <p style={{ position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)", color: "rgba(80,80,120,0.5)", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>
-        Click a marker to select an island
-      </p>
     </div>
   );
 }
