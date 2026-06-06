@@ -16,6 +16,7 @@
     "react-dom": "^19.2.4",
     "react-globe.gl": "^2.38.0",
     "three": "^0.184.0",
+    "three-render-objects": "^1.42.0",
     "zod": "^4.2.0"
   },
   "devDependencies": {

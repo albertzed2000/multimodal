@@ -1,5 +1,31 @@
 import { z } from "zod";
 
+export const PathfinderTaskSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  category: z.enum(["task", "project", "exploration", "discovery"]),
+  companionReward: z.string(),
+});
+
+export const PathfinderDestinationSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  type: z.enum(["interest", "discovery"]),
+  iconHint: z.string(),
+  emoji: z.string(),
+  observation: z.string(),
+  suggestedTasks: z.array(PathfinderTaskSchema),
+  backupTasks: z.array(PathfinderTaskSchema),
+});
+
+export const PathfinderWorldSchema = z.object({
+  destinations: z.array(PathfinderDestinationSchema),
+  mainTasks: z.array(PathfinderTaskSchema),
+  completedTasks: z.array(PathfinderTaskSchema),
+  completionNotes: z.array(z.string()),
+});
+
 export const PathfinderProfileSchema = z.object({
   archetype: z.string(),
   summary: z.string(),
@@ -12,9 +38,13 @@ export const PathfinderProfileSchema = z.object({
     baseType: z.string(),
     evolutionItems: z.array(z.string()),
   }),
+  world: PathfinderWorldSchema.optional(),
 });
 
 export type PathfinderProfile = z.infer<typeof PathfinderProfileSchema>;
+export type PathfinderTask = z.infer<typeof PathfinderTaskSchema>;
+export type PathfinderDestination = z.infer<typeof PathfinderDestinationSchema>;
+export type PathfinderWorld = z.infer<typeof PathfinderWorldSchema>;
 
 export type ParsedMessage = {
   conversationTitle: string;
@@ -207,7 +237,7 @@ export function fallbackProfile(messages: ParsedMessage[]): PathfinderProfile {
   const hasStartup = /startup|founder|product|hackathon|saas|launch|company/.test(joined);
   const hasCode = /code|typescript|next|react|api|database|python|engineering/.test(joined);
 
-  return {
+  const profile: PathfinderProfile = {
     archetype: hasStartup
       ? "The Systems Builder"
       : hasCode
@@ -251,6 +281,79 @@ export function fallbackProfile(messages: ParsedMessage[]): PathfinderProfile {
       ],
     },
   };
+
+  return {
+    ...profile,
+    world: buildFallbackWorld(profile),
+  };
+}
+
+export function buildFallbackWorld(profile: PathfinderProfile): PathfinderWorld {
+  const titles = [
+    profile.destinyThreads[0] ? shortTitle(profile.destinyThreads[0]) : "Builder Tools",
+    profile.destinyThreads[1] ? shortTitle(profile.destinyThreads[1]) : "Reflection Systems",
+    profile.destinyThreads[2] ? shortTitle(profile.destinyThreads[2]) : "Creative AI",
+  ];
+  const emojis = ["🛠️", "🧭", "✨"];
+
+  const destinations: PathfinderDestination[] = titles.map((title, index) => ({
+    id: `interest-${index + 1}`,
+    title,
+    type: "interest",
+    iconHint: title,
+    emoji: emojis[index],
+    observation:
+      profile.destinyThreads[index] ??
+      "This interest shows up as a recurring place where curiosity turns into action.",
+    suggestedTasks: makeFallbackTasks(profile.quests, index),
+    backupTasks: makeFallbackTasks(profile.unfinishedBusiness, index + 3),
+  }));
+
+  destinations.push({
+    id: "discovery",
+    title: "Discovery Pond",
+    type: "discovery",
+    iconHint: "miscellaneous discovery pond",
+    emoji: "🌿",
+    observation:
+      "This pond gathers miscellaneous interests, older goals, side projects, and half-finished sparks from your conversations.",
+    suggestedTasks: makeFallbackTasks(profile.reflections, 6),
+    backupTasks: makeFallbackTasks(profile.quests.concat(profile.unfinishedBusiness), 9),
+  });
+
+  return {
+    destinations,
+    mainTasks: [],
+    completedTasks: [],
+    completionNotes: [],
+  };
+}
+
+function makeFallbackTasks(items: string[], offset: number): PathfinderTask[] {
+  const fallback = [
+    "Write a 20-minute plan for one small prototype.",
+    "Turn one repeated question into a reusable checklist.",
+    "Schedule one conversation related to this interest.",
+  ];
+  return Array.from({ length: 3 }, (_, index) => {
+    const title = items[(index + offset) % Math.max(items.length, 1)] ?? fallback[index];
+    return {
+      id: `task-${offset}-${index}-${slugify(title).slice(0, 24)}`,
+      title: shortTitle(title),
+      description: title,
+      category: index === 1 ? "exploration" : "task",
+      companionReward: "A small glow of momentum for your companion.",
+    };
+  });
+}
+
+function shortTitle(value: string) {
+  const words = value.replace(/[^\w\s-]/g, "").split(/\s+/).filter(Boolean);
+  return words.slice(0, 4).join(" ") || "Curiosity Trail";
+}
+
+function slugify(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 function contentToText(content: MessageContent | undefined) {

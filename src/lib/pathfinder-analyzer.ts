@@ -4,8 +4,11 @@ import {
   ConversationChunkSummarySchema,
   PathfinderProfile,
   PathfinderProfileSchema,
+  PathfinderDestination,
+  PathfinderTask,
   ParsedMessage,
   buildChunkCorpus,
+  buildFallbackWorld,
   fallbackProfile,
 } from "@/lib/pathfinder";
 
@@ -26,6 +29,42 @@ export type AnalysisResult = {
   profile: PathfinderProfile;
   source: AnalysisSource;
 };
+
+const taskJsonSchema = {
+  type: "object",
+  required: ["id", "title", "description", "category", "companionReward"],
+  properties: {
+    id: { type: "string" },
+    title: { type: "string" },
+    description: { type: "string" },
+    category: { type: "string", enum: ["task", "project", "exploration", "discovery"] },
+    companionReward: { type: "string" },
+  },
+} satisfies JsonSchema;
+
+const destinationJsonSchema = {
+  type: "object",
+  required: [
+    "id",
+    "title",
+    "type",
+    "iconHint",
+    "emoji",
+    "observation",
+    "suggestedTasks",
+    "backupTasks",
+  ],
+  properties: {
+    id: { type: "string" },
+    title: { type: "string" },
+    type: { type: "string", enum: ["interest", "discovery"] },
+    iconHint: { type: "string" },
+    emoji: { type: "string" },
+    observation: { type: "string" },
+    suggestedTasks: { type: "array", items: taskJsonSchema },
+    backupTasks: { type: "array", items: taskJsonSchema },
+  },
+} satisfies JsonSchema;
 
 const chunkSummaryJsonSchema = {
   type: "object",
@@ -66,6 +105,7 @@ const profileJsonSchema = {
     "reflections",
     "quests",
     "companion",
+    "world",
   ],
   properties: {
     archetype: { type: "string" },
@@ -81,6 +121,16 @@ const profileJsonSchema = {
       properties: {
         baseType: { type: "string" },
         evolutionItems: { type: "array", items: { type: "string" } },
+      },
+    },
+    world: {
+      type: "object",
+      required: ["destinations", "mainTasks", "completedTasks", "completionNotes"],
+      properties: {
+        destinations: { type: "array", items: destinationJsonSchema },
+        mainTasks: { type: "array", items: taskJsonSchema },
+        completedTasks: { type: "array", items: taskJsonSchema },
+        completionNotes: { type: "array", items: { type: "string" } },
       },
     },
   },
@@ -142,7 +192,7 @@ export async function analyzePathfinderProfile({
     totalChunks: chunks.length,
   });
 
-  const profile = await synthesizeProfileWithGemini(summaries);
+  const profile = ensureWorld(await synthesizeProfileWithGemini(summaries));
   await onProgress?.({
     phase: "complete",
     message: "Profile analysis complete.",
@@ -183,6 +233,7 @@ async function synthesizeProfileWithGemini(summaries: ConversationChunkSummary[]
 Product direction:
 - Pathfinder is a gamified AI life coach, but this version should feel cute, uplifting, and practical.
 - The output powers a dashboard with an archetype card, companion card, highlights, strengths, destiny threads, gentle nudges, and small-win quests.
+- The globe is the primary UI. It needs exactly 4 destinations: the user's top 3 recurring interests plus a fourth "Discovery Pond" for miscellaneous interests, tasks, projects, and goals.
 - Keep the profile personal and specific to the recurring signals in the summaries.
 
 Rules:
@@ -192,6 +243,12 @@ Rules:
 - Unfinished business should feel like friendly next chapters, not criticism.
 - Reflections should be delightful discoveries the user can revisit.
 - Companion should be cute, symbolic, and tied to small wins.
+- world.destinations must contain exactly 4 items.
+- The first 3 destinations must have type "interest" and represent the user's top 3 interests from the summaries.
+- The fourth destination must have id "discovery", title "Discovery Pond", and type "discovery".
+- Each destination must include an iconHint, a matching single emoji, a profile-specific observation, exactly 3 suggestedTasks, and at least 5 backupTasks.
+- Task IDs must be stable lowercase slugs prefixed with the destination id, for example "interest-1-ship-demo".
+- mainTasks and completedTasks should start empty for a newly generated profile.
 - Avoid fantasy combat language, bosses, dragons, alternate-life regret framing, diagnosis, and therapy-speak.
 
 Chunk summaries:
@@ -199,6 +256,151 @@ ${JSON.stringify(summaries, null, 2)}`,
   });
 
   return PathfinderProfileSchema.parse(parseJsonText(text));
+}
+
+export async function generateMoreTasksForDestination({
+  profile,
+  destinationId,
+  count = 5,
+}: {
+  profile: PathfinderProfile;
+  destinationId: string;
+  count?: number;
+}) {
+  const world = profile.world ?? buildFallbackWorld(profile);
+  const destination = world.destinations.find((item) => item.id === destinationId);
+  if (!destination) {
+    throw new Error("Destination not found.");
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    return buildFallbackWorld(profile).destinations.find((item) => item.id === destinationId)?.backupTasks ?? [];
+  }
+
+  const text = await generateGeminiJson({
+    schema: {
+      type: "object",
+      required: ["tasks"],
+      properties: {
+        tasks: { type: "array", items: taskJsonSchema },
+      },
+    },
+    prompt: `Generate ${count} replacement Pathfinder tasks for this destination.
+
+Destination:
+${JSON.stringify(destination, null, 2)}
+
+Profile context:
+${JSON.stringify({
+  archetype: profile.archetype,
+  summary: profile.summary,
+  strengths: profile.strengths,
+  completedTasks: world.completedTasks,
+}, null, 2)}
+
+Rules:
+- Return only JSON.
+- Tasks must be doable in 1-7 days.
+- Use IDs prefixed with "${destination.id}-".
+- Do not repeat existing suggested, backup, main, or completed tasks.
+- Keep them practical, specific, and encouraging.`,
+  });
+
+  const parsed = parseJsonText(text) as { tasks?: PathfinderTask[] };
+  return Array.isArray(parsed.tasks) ? parsed.tasks.slice(0, count) : [];
+}
+
+export async function regenerateProfileAfterCompletion({
+  profile,
+  completedTask,
+}: {
+  profile: PathfinderProfile;
+  completedTask: PathfinderTask;
+}) {
+  const world = profile.world ?? buildFallbackWorld(profile);
+
+  if (!process.env.GEMINI_API_KEY) {
+    return ensureWorld({
+      ...profile,
+      summary: `${profile.summary} You recently completed "${completedTask.title}", adding fresh momentum to your path.`,
+      world: {
+        ...world,
+        completedTasks: dedupeTasks([...world.completedTasks, completedTask]),
+        completionNotes: [
+          ...world.completionNotes,
+          `Completed "${completedTask.title}" and gained ${completedTask.companionReward}`,
+        ],
+      },
+    });
+  }
+
+  const text = await generateGeminiJson({
+    schema: profileJsonSchema,
+    prompt: `Update this Pathfinder profile after a completed task.
+
+Current profile:
+${JSON.stringify(profile, null, 2)}
+
+Completed task:
+${JSON.stringify(completedTask, null, 2)}
+
+Rules:
+- Return the full updated profile JSON.
+- Preserve the same top-level profile shape and world shape.
+- Add the completed task to world.completedTasks.
+- Remove it from world.mainTasks if present.
+- Add a concise completion note.
+- Refresh summary, reflections, companion evolution, and destination observations to acknowledge progress.
+- Do not erase existing completed task history.`,
+  });
+
+  return ensureWorld(PathfinderProfileSchema.parse(parseJsonText(text)));
+}
+
+function ensureWorld(profile: PathfinderProfile): PathfinderProfile {
+  const world = profile.world ?? buildFallbackWorld(profile);
+  const destinations = normalizeDestinations(world.destinations, profile);
+  return {
+    ...profile,
+    world: {
+      destinations,
+      mainTasks: dedupeTasks(world.mainTasks ?? []),
+      completedTasks: dedupeTasks(world.completedTasks ?? []),
+      completionNotes: world.completionNotes ?? [],
+    },
+  };
+}
+
+function normalizeDestinations(
+  destinations: NonNullable<PathfinderProfile["world"]>["destinations"],
+  profile: PathfinderProfile,
+): PathfinderDestination[] {
+  const fallback = buildFallbackWorld(profile).destinations;
+  const normalized = destinations.slice(0, 4);
+  while (normalized.length < 4) {
+    normalized.push(fallback[normalized.length]);
+  }
+  return normalized.map((destination, index): PathfinderDestination => {
+    const type: PathfinderDestination["type"] = index === 3 ? "discovery" : "interest";
+    return {
+      ...destination,
+      id: index === 3 ? "discovery" : destination.id || `interest-${index + 1}`,
+      type,
+      title: index === 3 ? "Discovery Pond" : destination.title,
+      suggestedTasks: destination.suggestedTasks.slice(0, 3),
+      backupTasks: destination.backupTasks.length ? destination.backupTasks : fallback[index].backupTasks,
+    };
+  });
+}
+
+function dedupeTasks(tasks: PathfinderTask[]) {
+  const seen = new Set<string>();
+  return tasks.filter((task) => {
+    const key = task.id || task.title;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 async function generateGeminiJson({

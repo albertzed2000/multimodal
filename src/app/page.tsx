@@ -5,7 +5,6 @@ import {
   Compass,
   Map,
   RefreshCcw,
-  Shield,
   Sparkles,
   Swords,
   Trophy,
@@ -15,7 +14,13 @@ import {
   Star,
 } from "lucide-react";
 import { useMemo, useState, lazy, Suspense, useEffect } from "react";
-import type { PathfinderProfile, ParseStats } from "@/lib/pathfinder";
+import {
+  buildFallbackWorld,
+  type PathfinderDestination,
+  type PathfinderProfile,
+  type PathfinderTask,
+  type ParseStats,
+} from "@/lib/pathfinder";
 import type { GlobeMarker } from "@/components/GlobeView";
 
 const GlobeView = lazy(() => import("@/components/GlobeView"));
@@ -78,11 +83,13 @@ export default function Home() {
       if (!raw) return;
       const saved = JSON.parse(raw) as SavedProfileResponse;
       if (saved?.profile) {
-        setProfile(saved.profile);
-        setProfileId(saved.profileId ?? null);
-        setStats(saved.stats ?? null);
-        setSource(saved.source ?? null);
-        setStatus("world");
+        window.setTimeout(() => {
+          setProfile(saved.profile);
+          setProfileId(saved.profileId ?? null);
+          setStats(saved.stats ?? null);
+          setSource(saved.source ?? null);
+          setStatus("world");
+        }, 0);
       }
     } catch {
       // ignore corrupt storage
@@ -154,6 +161,7 @@ export default function Home() {
   if (status === "world" && profile) {
     return (
       <WorldScreen
+        key={profileId ?? "local-profile"}
         profile={profile}
         profileId={profileId}
         stats={stats}
@@ -289,7 +297,6 @@ function LoadingScreen({ count, progress }: { count: number; progress: JobProgre
 }
 
 const ISLAND_COLORS = ["#e9c46a", "#2a9d8f", "#f4a261", "#8ab17d", "#e76f51"];
-const ISLAND_EMOJIS = ["🎨", "🧭", "🌿", "✨"];
 const ISLAND_POSITIONS: Array<{ lat: number; lng: number }> = [
   { lat: 35, lng: -30 },
   { lat: -20, lng: 60 },
@@ -298,55 +305,33 @@ const ISLAND_POSITIONS: Array<{ lat: number; lng: number }> = [
 ];
 
 function buildIslands(profile: PathfinderProfile): GlobeMarker[] {
-  const threads = profile.destinyThreads.slice(0, 3);
-  const islands: GlobeMarker[] = threads.map((thread, i) => ({
-    id: `island-${i}`,
+  const world = profile.world ?? buildFallbackWorld(profile);
+  return world.destinations.slice(0, 4).map((destination, i) => ({
+    id: destination.id,
     lat: ISLAND_POSITIONS[i].lat,
     lng: ISLAND_POSITIONS[i].lng,
-    label: `Island ${i + 1}`,
+    label: destination.title,
     color: ISLAND_COLORS[i],
-    emoji: ISLAND_EMOJIS[i],
+    emoji: destination.emoji || emojiForInterest(destination.iconHint),
   }));
-  islands.push({
-    id: "discovery",
-    lat: ISLAND_POSITIONS[3].lat,
-    lng: ISLAND_POSITIONS[3].lng,
-    label: "Discovery Pond",
-    color: ISLAND_COLORS[3],
-    emoji: ISLAND_EMOJIS[3],
-  });
-  return islands;
 }
 
 type IslandDetail = {
   marker: GlobeMarker;
-  title: string;
-  description: string;
-  quests: string[];
-  strengths: string[];
+  destination: PathfinderDestination;
 };
 
 function buildIslandDetail(
   marker: GlobeMarker,
   profile: PathfinderProfile,
-  index: number,
 ): IslandDetail {
-  if (marker.id === "discovery") {
-    return {
-      marker,
-      title: "Discovery Pond",
-      description:
-        "Hidden interests and forgotten sparks float here, waiting to be rediscovered.",
-      quests: profile.unfinishedBusiness,
-      strengths: profile.reflections.slice(0, 2),
-    };
-  }
+  const world = profile.world ?? buildFallbackWorld(profile);
+  const destination =
+    world.destinations.find((item) => item.id === marker.id) ??
+    world.destinations[0];
   return {
     marker,
-    title: `Island ${index + 1}: ${profile.destinyThreads[index]?.split(" ").slice(0, 4).join(" ") ?? ""}`,
-    description: profile.destinyThreads[index] ?? "",
-    quests: profile.quests.slice(index * 1, index * 1 + 2),
-    strengths: profile.strengths.slice(index, index + 1),
+    destination,
   };
 }
 
@@ -363,26 +348,127 @@ function WorldScreen({
   source: AnalyzeResponse["source"] | null;
   onReset: () => void;
 }) {
+  const [currentProfile, setCurrentProfile] = useState<PathfinderProfile>(() => ensureProfileWorld(profile));
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [completedQuests, setCompletedQuests] = useState<Set<string>>(new Set());
+  const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
+  const [taskError, setTaskError] = useState<string | null>(null);
 
-  const islands = useMemo(() => buildIslands(profile), [profile]);
+  const world = currentProfile.world ?? buildFallbackWorld(currentProfile);
+  const mainTasks = world.mainTasks;
+  const completedTasks = world.completedTasks;
+  const islands = useMemo(() => buildIslands(currentProfile), [currentProfile]);
 
   const selectedIsland = useMemo(() => {
     if (!selectedId) return null;
     const marker = islands.find((m) => m.id === selectedId);
     if (!marker) return null;
-    const index = islands.indexOf(marker);
-    return buildIslandDetail(marker, profile, index);
-  }, [selectedId, islands, profile]);
+    return buildIslandDetail(marker, currentProfile);
+  }, [selectedId, islands, currentProfile]);
 
-  function toggleQuest(quest: string) {
-    setCompletedQuests((prev) => {
-      const next = new Set(prev);
-      if (next.has(quest)) next.delete(quest);
-      else next.add(quest);
-      return next;
-    });
+  async function applySavedProfile(saved: SavedProfileResponse) {
+    setCurrentProfile(ensureProfileWorld(saved.profile));
+    window.localStorage.setItem(storageKey, JSON.stringify(saved));
+  }
+
+  function applyLocalProfile(next: PathfinderProfile) {
+    const withWorld = ensureProfileWorld(next);
+    setCurrentProfile(withWorld);
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        profileId,
+        profile: withWorld,
+        stats,
+        source,
+        createdAt: new Date().toISOString(),
+      }),
+    );
+  }
+
+  async function addTask(task: PathfinderTask) {
+    setBusyTaskId(task.id);
+    setTaskError(null);
+    try {
+      if (profileId) {
+        const saved = await patchTask(profileId, { action: "add", task });
+        await applySavedProfile(saved);
+      } else {
+        applyLocalProfile({
+          ...currentProfile,
+          world: { ...world, mainTasks: dedupeTasks([...mainTasks, task]) },
+        });
+      }
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "Could not add task.");
+    } finally {
+      setBusyTaskId(null);
+    }
+  }
+
+  async function dismissTask(destinationId: string, task: PathfinderTask) {
+    setBusyTaskId(task.id);
+    setTaskError(null);
+    try {
+      if (profileId) {
+        let saved = await patchTask(profileId, { action: "dismiss", destinationId, task });
+        let destination = saved.profile.world?.destinations.find((item) => item.id === destinationId);
+        if (destination && destination.suggestedTasks.length < 3) {
+          saved = await generateTasks(profileId, destinationId);
+          destination = saved.profile.world?.destinations.find((item) => item.id === destinationId);
+          if (destination && destination.suggestedTasks.length < 3) {
+            saved = await patchTask(profileId, { action: "dismiss", destinationId, task });
+          }
+        }
+        await applySavedProfile(saved);
+      } else {
+        const destinations = world.destinations.map((destination) => {
+          if (destination.id !== destinationId) return destination;
+          const [replacement, ...backupTasks] = destination.backupTasks;
+          const suggestedTasks = destination.suggestedTasks.filter((item) => item.id !== task.id);
+          return {
+            ...destination,
+            suggestedTasks: replacement
+              ? dedupeTasks([...suggestedTasks, replacement]).slice(0, 3)
+              : suggestedTasks,
+            backupTasks,
+          };
+        });
+        applyLocalProfile({ ...currentProfile, world: { ...world, destinations } });
+      }
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "Could not replace task.");
+    } finally {
+      setBusyTaskId(null);
+    }
+  }
+
+  async function completeTask(task: PathfinderTask) {
+    setBusyTaskId(task.id);
+    setTaskError(null);
+    try {
+      if (profileId) {
+        const saved = await patchTask(profileId, { action: "complete", task });
+        await applySavedProfile(saved);
+      } else {
+        applyLocalProfile({
+          ...currentProfile,
+          summary: `${currentProfile.summary} You completed "${task.title}", adding new momentum.`,
+          world: {
+            ...world,
+            mainTasks: mainTasks.filter((item) => item.id !== task.id),
+            completedTasks: dedupeTasks([...completedTasks, task]),
+            completionNotes: [
+              ...world.completionNotes,
+              `Completed "${task.title}" and gained ${task.companionReward}`,
+            ],
+          },
+        });
+      }
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "Could not complete task.");
+    } finally {
+      setBusyTaskId(null);
+    }
   }
 
   return (
@@ -395,7 +481,7 @@ function WorldScreen({
           </div>
           <span className="font-bold text-[#3d3228]">Pathfinder</span>
           <span className="ml-1 rounded-full border-2 border-[#d4f2ec] bg-[#f0faf8] px-2.5 py-0.5 text-xs font-semibold text-[#5aab9b]">
-            {profile.archetype}
+            {currentProfile.archetype}
           </span>
         </div>
         <button
@@ -419,17 +505,17 @@ function WorldScreen({
               </div>
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-[#5aab9b]">Companion</p>
-                <h2 className="font-bold text-[#3d3228]">{profile.companion.baseType}</h2>
+                <h2 className="font-bold text-[#3d3228]">{currentProfile.companion.baseType}</h2>
               </div>
             </div>
-            <p className="mt-3 text-sm leading-6 text-[#5a6e68]">{profile.summary}</p>
+            <p className="mt-3 text-sm leading-6 text-[#5a6e68]">{currentProfile.summary}</p>
           </div>
 
           {/* Your Islands */}
           <div>
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#a09080]">Your Islands</p>
             <div className="space-y-2">
-              {islands.map((island, i) => {
+              {islands.map((island) => {
                 const isActive = selectedId === island.id;
                 const pastelBg: Record<string, string> = {
                   "island-0": "#fff7d6", "island-1": "#d4f2ec",
@@ -454,13 +540,42 @@ function WorldScreen({
                   >
                     <span className="text-xl">{island.emoji}</span>
                     <p className="text-sm font-semibold" style={{ color: isActive ? "#3d3228" : "#7a6a5a" }}>
-                      {island.id === "discovery"
-                        ? "Discovery Pond"
-                        : profile.destinyThreads[i]?.split(" ").slice(0, 5).join(" ") ?? `Island ${i + 1}`}
+                      {island.label}
                     </p>
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border-2 border-[#fde8d8] bg-[#fff8f4] p-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#d4805a]">
+              <Swords className="size-3.5" /> Main Task List
+            </p>
+            <div className="space-y-2">
+              {mainTasks.length ? (
+                mainTasks.map((task) => (
+                  <button
+                    key={task.id}
+                    className="flex w-full gap-2 rounded-xl border-2 border-[#fde8d8] bg-white/75 p-2 text-left text-sm leading-5 text-[#6a5a4a] transition hover:border-[#f4a07a] disabled:opacity-60"
+                    onClick={() => completeTask(task)}
+                    disabled={busyTaskId === task.id}
+                    title="Complete task"
+                  >
+                    <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded border border-[#7ecfbf] text-[10px] font-bold text-[#7ecfbf]">
+                      ✓
+                    </span>
+                    <span>
+                      <span className="block font-semibold text-[#3d3228]">{task.title}</span>
+                      <span className="line-clamp-2">{task.description}</span>
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <p className="text-sm leading-5 text-[#7a6a5a]">
+                  Add tasks from any destination with the + button.
+                </p>
+              )}
             </div>
           </div>
 
@@ -470,7 +585,7 @@ function WorldScreen({
               <Sparkles className="size-3.5" /> Strengths
             </p>
             <div className="space-y-2">
-              {profile.strengths.map((s) => (
+              {currentProfile.strengths.map((s) => (
                 <p key={s} className="text-sm leading-5 text-[#6a5a3a]">{s}</p>
               ))}
             </div>
@@ -519,10 +634,10 @@ function WorldScreen({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest text-[#a09080]">
-                    {selectedIsland.marker.emoji} Island
+              {selectedIsland.marker.emoji} Destination
                   </p>
                   <h2 className="mt-1 text-xl font-bold leading-tight text-[#3d3228]">
-                    {selectedIsland.title}
+                    {selectedIsland.destination.title}
                   </h2>
                 </div>
                 <button
@@ -533,49 +648,46 @@ function WorldScreen({
                 </button>
               </div>
 
-              <p className="text-sm leading-6 text-[#7a6a5a]">{selectedIsland.description}</p>
+              <div className="rounded-2xl border-2 border-[#d4f2ec] bg-[#f0faf8] p-4">
+                <p className="mb-2 text-xs font-bold uppercase tracking-widest text-[#5aab9b]">
+                  Observation
+                </p>
+                <p className="text-sm leading-6 text-[#5a6e68]">
+                  {selectedIsland.destination.observation}
+                </p>
+              </div>
 
-              {selectedIsland.quests.length > 0 && (
+              {selectedIsland.destination.suggestedTasks.length > 0 && (
                 <div>
                   <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#d4805a]">
-                    <Swords className="size-3.5" /> Quests
+                    <Swords className="size-3.5" /> Suggested tasks and projects
                   </p>
                   <div className="space-y-2">
-                    {selectedIsland.quests.map((quest) => (
-                      <label
-                        key={quest}
-                        className="flex cursor-pointer gap-3 rounded-2xl border-2 border-[#fde8d8] bg-[#fff8f4] p-3 transition hover:border-[#f4a07a]"
-                      >
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 accent-[#7ecfbf]"
-                          checked={completedQuests.has(quest)}
-                          onChange={() => toggleQuest(quest)}
-                        />
-                        <span className="text-sm leading-5 text-[#6a5a4a]">{quest}</span>
-                      </label>
+                    {selectedIsland.destination.suggestedTasks.slice(0, 3).map((task) => (
+                      <TaskSuggestionCard
+                        key={task.id}
+                        task={task}
+                        busy={busyTaskId === task.id}
+                        onAdd={() => addTask(task)}
+                        onDismiss={() => dismissTask(selectedIsland.destination.id, task)}
+                      />
                     ))}
                   </div>
                 </div>
               )}
 
-              {selectedIsland.strengths.length > 0 && (
-                <div className="rounded-2xl border-2 border-[#d4f2ec] bg-[#f0faf8] p-4">
-                  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-[#5aab9b]">
-                    Reflection
-                  </p>
-                  {selectedIsland.strengths.map((s) => (
-                    <p key={s} className="text-sm leading-6 text-[#5a6e68]">{s}</p>
-                  ))}
-                </div>
-              )}
+              {taskError ? (
+                <p className="rounded-2xl border-2 border-red-200 bg-red-50 p-3 text-sm text-red-600">
+                  {taskError}
+                </p>
+              ) : null}
 
               <div className="rounded-2xl border-2 border-[#fef6cc] bg-[#fffdf0] p-4">
                 <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#c4a020]">
                   <Star className="size-3.5" /> Companion Rewards
                 </p>
                 <div className="space-y-1.5">
-                  {profile.companion.evolutionItems.map((item) => (
+                  {currentProfile.companion.evolutionItems.map((item) => (
                     <p key={item} className="text-sm leading-5 text-[#7a6a3a]">{item}</p>
                   ))}
                 </div>
@@ -585,35 +697,45 @@ function WorldScreen({
             <>
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-[#d4805a]">
-                  <Swords className="mr-1 inline size-3.5" /> All Quests
+                  <Swords className="mr-1 inline size-3.5" /> Main Task List
                 </p>
-                <h2 className="mt-1 text-xl font-bold text-[#3d3228]">Small wins to try</h2>
+                <h2 className="mt-1 text-xl font-bold text-[#3d3228]">Accepted tasks</h2>
               </div>
               <div className="space-y-2">
-                {profile.quests.map((quest, index) => (
-                  <label
-                    key={quest}
-                    className="flex cursor-pointer gap-3 rounded-2xl border-2 border-[#fde8d8] bg-[#fff8f4] p-3 transition hover:border-[#f4a07a]"
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 size-4 shrink-0 accent-[#7ecfbf]"
-                      checked={completedQuests.has(quest)}
-                      onChange={() => toggleQuest(quest)}
+                {mainTasks.length ? (
+                  mainTasks.map((task) => (
+                    <TaskTodoCard
+                      key={task.id}
+                      task={task}
+                      busy={busyTaskId === task.id}
+                      onComplete={() => completeTask(task)}
                     />
-                    <span>
-                      <span className="block text-xs font-bold text-[#c4a060]">Quest {index + 1}</span>
-                      <span className="text-sm leading-5 text-[#6a5a4a]">{quest}</span>
-                    </span>
-                  </label>
-                ))}
+                  ))
+                ) : (
+                  <p className="rounded-2xl border-2 border-[#d4f2ec] bg-white/70 p-4 text-sm leading-6 text-[#7a6a5a]">
+                    Click a destination, then use + to add suggested tasks here.
+                  </p>
+                )}
               </div>
+
+              {completedTasks.length > 0 ? (
+                <div className="rounded-2xl border-2 border-[#d4f2ec] bg-[#f0faf8] p-4">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-[#5aab9b]">
+                    Completed
+                  </p>
+                  {completedTasks.slice(-3).map((task) => (
+                    <p key={task.id} className="mb-2 text-sm leading-5 text-[#5a6e68]">
+                      ✓ {task.title}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
 
               <div className="rounded-2xl border-2 border-[#fef6cc] bg-[#fffdf0] p-4">
                 <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#c4a020]">
                   <Trophy className="size-3.5" /> Destiny Threads
                 </p>
-                {profile.destinyThreads.map((t) => (
+                {currentProfile.destinyThreads.map((t) => (
                   <p key={t} className="mb-2 text-sm leading-5 text-[#7a6a3a]">{t}</p>
                 ))}
               </div>
@@ -634,53 +756,147 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function MapNode({ index, text }: { index: number; text: string }) {
-  const colors = ["#e9c46a", "#2a9d8f", "#e76f51", "#8ab17d", "#f4a261"];
+function TaskSuggestionCard({
+  task,
+  busy,
+  onAdd,
+  onDismiss,
+}: {
+  task: PathfinderTask;
+  busy: boolean;
+  onAdd: () => void;
+  onDismiss: () => void;
+}) {
   return (
-    <article className="rounded-md border border-white/12 bg-black/35 p-4 shadow-xl shadow-black/20">
-      <div className="flex items-center gap-3">
-        <span
-          className="grid size-9 place-items-center rounded-full font-mono text-sm text-black"
-          style={{ backgroundColor: colors[index % colors.length] }}
-        >
-          {index + 1}
-        </span>
-        <h3 className="font-semibold">Highlight</h3>
+    <article className="rounded-2xl border-2 border-[#fde8d8] bg-[#fff8f4] p-3 transition hover:border-[#f4a07a]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-[#c4a060]">
+            {task.category}
+          </p>
+          <h3 className="mt-1 text-sm font-bold text-[#3d3228]">{task.title}</h3>
+          <p className="mt-1 text-sm leading-5 text-[#6a5a4a]">{task.description}</p>
+        </div>
+        <div className="flex shrink-0 gap-1.5">
+          <button
+            className="grid size-8 place-items-center rounded-xl bg-[#7ecfbf] text-white transition hover:bg-[#63b8a9] disabled:opacity-50"
+            onClick={onAdd}
+            disabled={busy}
+            title="Add to main task list"
+          >
+            +
+          </button>
+          <button
+            className="grid size-8 place-items-center rounded-xl border-2 border-[#e0d8d0] bg-white text-[#a09080] transition hover:bg-[#f0e8e0] disabled:opacity-50"
+            onClick={onDismiss}
+            disabled={busy}
+            title="Replace this suggestion"
+          >
+            ×
+          </button>
+        </div>
       </div>
-      <p className="mt-3 text-sm leading-6 text-white/66">{text}</p>
+      <p className="mt-2 text-xs text-[#b08a70]">{task.companionReward}</p>
     </article>
   );
 }
 
-function Panel({
-  title,
-  icon,
-  items,
+function TaskTodoCard({
+  task,
+  busy,
+  onComplete,
 }: {
-  title: string;
-  icon: React.ReactNode;
-  items: string[];
+  task: PathfinderTask;
+  busy: boolean;
+  onComplete: () => void;
 }) {
   return (
-    <section className="rounded-md border border-white/10 bg-black/25 p-4">
-      <h3 className="flex items-center gap-2 font-semibold text-white/88">
-        {icon}
-        {title}
-      </h3>
-      <div className="mt-3 space-y-2">
-        {items.map((item) => (
-          <p key={item} className="text-sm leading-6 text-white/62">
-            {item}
-          </p>
-        ))}
+    <article className="rounded-2xl border-2 border-[#fde8d8] bg-[#fff8f4] p-3">
+      <div className="flex gap-3">
+        <button
+          type="button"
+          className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border-2 border-[#7ecfbf] bg-white text-xs font-bold text-[#7ecfbf] transition hover:bg-[#d4f2ec] disabled:opacity-50"
+          onClick={onComplete}
+          disabled={busy}
+          title="Complete task"
+        >
+          ✓
+        </button>
+        <span>
+          <span className="block text-xs font-bold text-[#c4a060]">{task.category}</span>
+          <span className="block text-sm font-semibold leading-5 text-[#3d3228]">{task.title}</span>
+          <span className="mt-1 block text-sm leading-5 text-[#6a5a4a]">{task.description}</span>
+        </span>
       </div>
-    </section>
+    </article>
   );
 }
 
 async function readJsonFile(file: File) {
   const text = await file.text();
   return JSON.parse(text);
+}
+
+async function patchTask(
+  profileId: string,
+  body: {
+    action: "add" | "dismiss" | "complete";
+    destinationId?: string;
+    task: PathfinderTask;
+  },
+) {
+  const response = await fetch(`/api/profile/${profileId}/tasks`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const saved = (await response.json()) as SavedProfileResponse;
+  if (!response.ok) {
+    throw new Error(saved.error ?? "Task update failed.");
+  }
+  return saved;
+}
+
+async function generateTasks(profileId: string, destinationId: string) {
+  const response = await fetch(`/api/profile/${profileId}/tasks/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ destinationId, count: 5 }),
+  });
+  const saved = (await response.json()) as SavedProfileResponse;
+  if (!response.ok) {
+    throw new Error(saved.error ?? "Task generation failed.");
+  }
+  return saved;
+}
+
+function ensureProfileWorld(profile: PathfinderProfile): PathfinderProfile {
+  return {
+    ...profile,
+    world: profile.world ?? buildFallbackWorld(profile),
+  };
+}
+
+function dedupeTasks(tasks: PathfinderTask[]) {
+  const seen = new Set<string>();
+  return tasks.filter((task) => {
+    const key = task.id || task.title;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function emojiForInterest(value: string) {
+  const lower = value.toLowerCase();
+  if (/code|engineer|developer|software|api|backend|tool/.test(lower)) return "🛠️";
+  if (/design|art|creative|visual|brand/.test(lower)) return "🎨";
+  if (/ai|model|agent|automation|chat/.test(lower)) return "✨";
+  if (/health|fitness|body|habit/.test(lower)) return "🌱";
+  if (/career|startup|founder|business|product/.test(lower)) return "🚀";
+  if (/writing|story|content|journal/.test(lower)) return "✍️";
+  if (/learn|research|study|knowledge/.test(lower)) return "📚";
+  return "🧭";
 }
 
 async function pollAnalysisJob(

@@ -92,6 +92,21 @@ export async function readProfile(profileId: string) {
   return readJson<SavedProfile>(profilePath(profileId));
 }
 
+export async function writeProfile(saved: SavedProfile) {
+  await ensureDir(profilesDir);
+  await writeFile(profilePath(saved.profileId), JSON.stringify(saved, null, 2));
+  return saved;
+}
+
+export async function updateProfile(
+  profileId: string,
+  updater: (saved: SavedProfile) => SavedProfile | Promise<SavedProfile>,
+) {
+  const current = await readProfile(profileId);
+  const next = await updater(current);
+  return writeProfile(next);
+}
+
 async function writeJob(job: AnalysisJob) {
   await ensureDir(jobsDir);
   await writeFile(jobPath(job.jobId), JSON.stringify(job, null, 2));
