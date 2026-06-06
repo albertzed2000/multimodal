@@ -10,10 +10,10 @@ const GlobeView = lazy(() => import("@/components/GlobeView"));
 // between them without anything popping in/out of view. Positions are
 // deliberately scattered (varied lat/lng) rather than laid out on a grid.
 const ISLANDS: GlobeMarker[] = [
-  { id: "island-0", lat: 51, lng: -19, label: "Build tools", color: "#e9c46a", emoji: "🎨" },
-  { id: "island-2", lat: 8, lng: 44, label: "AI & creativity", color: "#f4a261", emoji: "🌿" },
-  { id: "discovery", lat: -33, lng: -41, label: "Discovery Pond", color: "#8ab17d", emoji: "✨" },
-  { id: "island-1", lat: -12, lng: 11, label: "Reflection systems", color: "#2a9d8f", emoji: "🧭" },
+  { id: "island-0", lat: 48, lng: -18, label: "Build tools", color: "#e9c46a", emoji: "🎨" },
+  { id: "island-2", lat: 6, lng: 40, label: "AI & creativity", color: "#f4a261", emoji: "🌿" },
+  { id: "discovery", lat: -22, lng: -28, label: "Discovery Pond", color: "#8ab17d", emoji: "✨" },
+  { id: "island-1", lat: -14, lng: 9, label: "Reflection systems", color: "#2a9d8f", emoji: "🧭" },
 ];
 
 export default function GlobePage() {

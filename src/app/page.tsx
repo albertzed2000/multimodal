@@ -10,7 +10,6 @@ import {
   Trophy,
   Upload,
   X,
-  Anchor,
   Star,
 } from "lucide-react";
 import { useMemo, useState, lazy, Suspense, useEffect } from "react";
@@ -297,11 +296,14 @@ function LoadingScreen({ count, progress }: { count: number; progress: JobProgre
 }
 
 const ISLAND_COLORS = ["#e9c46a", "#2a9d8f", "#f4a261", "#8ab17d", "#e76f51"];
+// All four islands sit on the front-facing hemisphere (camera looks at lat 18,
+// lng 0) so they stay visible on the stationary globe and the cat can walk
+// between any of them without targets falling off-screen.
 const ISLAND_POSITIONS: Array<{ lat: number; lng: number }> = [
-  { lat: 35, lng: -30 },
-  { lat: -20, lng: 60 },
-  { lat: 50, lng: 140 },
-  { lat: -40, lng: -100 },
+  { lat: 48, lng: -18 },
+  { lat: -14, lng: 9 },
+  { lat: 6, lng: 40 },
+  { lat: -22, lng: -28 },
 ];
 
 function buildIslands(profile: PathfinderProfile): GlobeMarker[] {
@@ -511,43 +513,6 @@ function WorldScreen({
             <p className="mt-3 text-sm leading-6 text-[#5a6e68]">{currentProfile.summary}</p>
           </div>
 
-          {/* Your Islands */}
-          <div>
-            <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#a09080]">Your Islands</p>
-            <div className="space-y-2">
-              {islands.map((island) => {
-                const isActive = selectedId === island.id;
-                const pastelBg: Record<string, string> = {
-                  "island-0": "#fff7d6", "island-1": "#d4f2ec",
-                  "island-2": "#fde8d8", "discovery": "#dff2d0",
-                };
-                const pastelBorder: Record<string, string> = {
-                  "island-0": "#f5c842", "island-1": "#7ecfbf",
-                  "island-2": "#f4a07a", "discovery": "#93c47d",
-                };
-                const bg = pastelBg[island.id] ?? "#fff";
-                const border = pastelBorder[island.id] ?? "#ccc";
-                return (
-                  <button
-                    key={island.id}
-                    onClick={() => setSelectedId(island.id === selectedId ? null : island.id)}
-                    className="flex w-full items-center gap-3 rounded-2xl border-2 px-3 py-2.5 text-left transition"
-                    style={{
-                      borderColor: border,
-                      background: isActive ? bg : "rgba(255,255,255,0.6)",
-                      boxShadow: isActive ? `0 4px 14px ${border}44` : "none",
-                    }}
-                  >
-                    <span className="text-xl">{island.emoji}</span>
-                    <p className="text-sm font-semibold" style={{ color: isActive ? "#3d3228" : "#7a6a5a" }}>
-                      {island.label}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           <div className="rounded-2xl border-2 border-[#fde8d8] bg-[#fff8f4] p-4">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#d4805a]">
               <Swords className="size-3.5" /> Main Task List
@@ -610,15 +575,6 @@ function WorldScreen({
           >
             <GlobeView markers={islands} selectedId={selectedId} onSelect={setSelectedId} />
           </Suspense>
-
-          {/* Forgotten projects chip */}
-          <button
-            onClick={() => setSelectedId(selectedId === "discovery" ? null : "discovery")}
-            className="absolute bottom-6 left-6 flex items-center gap-2 rounded-2xl border-2 border-[#93c47d] bg-white/90 px-4 py-2.5 text-sm font-bold text-[#5a8a4a] shadow-lg shadow-[#93c47d]/20 backdrop-blur transition hover:bg-[#dff2d0]"
-          >
-            <Anchor className="size-4" />
-            Forgotten Projects
-          </button>
 
           {!selectedId && (
             <p className="absolute bottom-6 right-6 text-xs font-medium text-[#a09080]">

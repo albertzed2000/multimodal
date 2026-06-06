@@ -130,9 +130,24 @@ function makeBadge(marker: GlobeMarker, onClickId: (id: string) => void) {
   const color = marker.color;
   const PIN_W = 40;
   const PIN_H = 52;
+  // The pin SVG's head circle is centered at viewBox (20, 19); use the same
+  // coordinates (in px) to anchor the emoji exactly on that center.
+  const HEAD_CY = 19;
 
   const wrap = document.createElement("div");
   wrap.style.cssText = `position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;user-select:none;`;
+
+  // Always-visible label sitting above the pin.
+  const tag = document.createElement("div");
+  tag.style.cssText = `
+    margin-bottom:4px; padding:2px 8px;
+    background:white; border:2px solid ${color}; border-radius:14px;
+    font-size:9px; font-weight:700; color:#4a3f35;
+    white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,0.12);
+    letter-spacing:0.03em; font-family:system-ui, sans-serif;
+    pointer-events:none;
+  `;
+  tag.textContent = marker.label;
 
   // Location-pin shape (teardrop with a circular hole), tinted per node.
   const pin = document.createElement("div");
@@ -142,38 +157,21 @@ function makeBadge(marker: GlobeMarker, onClickId: (id: string) => void) {
     <circle cx="20" cy="19" r="9" fill="#ffffff"/>
   </svg>`;
 
-  // Emoji nestled in the pin head.
+  // Emoji centered exactly on the pin head circle.
   const emoji = document.createElement("div");
   emoji.textContent = marker.emoji;
-  emoji.style.cssText = `position:absolute;top:8px;left:0;width:100%;text-align:center;font-size:15px;line-height:1;pointer-events:none;`;
+  emoji.style.cssText = `position:absolute;left:0;width:100%;top:${HEAD_CY}px;transform:translateY(-50%);text-align:center;font-size:14px;line-height:1;pointer-events:none;`;
   pin.appendChild(emoji);
 
-  // Label hidden until hover.
-  const tag = document.createElement("div");
-  tag.style.cssText = `
-    position:absolute; top:${PIN_H + 4}px; left:50%;
-    transform:translateX(-50%) translateY(-4px); opacity:0;
-    transition:opacity 0.15s ease, transform 0.15s ease; pointer-events:none;
-    background:white; border:2.5px solid ${color}; border-radius:20px;
-    padding:3px 11px; font-size:10.5px; font-weight:700; color:#4a3f35;
-    white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,0.12);
-    letter-spacing:0.03em; font-family:system-ui, sans-serif;
-  `;
-  tag.textContent = marker.label;
-
-  wrap.appendChild(pin);
   wrap.appendChild(tag);
+  wrap.appendChild(pin);
 
   wrap.addEventListener("click", () => onClickId(marker.id));
   wrap.addEventListener("mouseenter", () => {
     pin.style.transform = "scale(1.18) translateY(-3px)";
-    tag.style.opacity = "1";
-    tag.style.transform = "translateX(-50%) translateY(0)";
   });
   wrap.addEventListener("mouseleave", () => {
     pin.style.transform = "scale(1)";
-    tag.style.opacity = "0";
-    tag.style.transform = "translateX(-50%) translateY(-4px)";
   });
 
   return wrap;
