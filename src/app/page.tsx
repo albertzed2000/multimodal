@@ -3,7 +3,6 @@
 import {
   ArrowRight,
   Compass,
-  FileJson,
   Map,
   RefreshCcw,
   Shield,
@@ -11,9 +10,15 @@ import {
   Swords,
   Trophy,
   Upload,
+  X,
+  Anchor,
+  Star,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, lazy, Suspense, useEffect } from "react";
 import type { PathfinderProfile, ParseStats } from "@/lib/pathfinder";
+import type { GlobeMarker } from "@/components/GlobeView";
+
+const GlobeView = lazy(() => import("@/components/GlobeView"));
 
 type AnalyzeResponse = {
   profile: PathfinderProfile;
@@ -66,6 +71,23 @@ export default function Home() {
   const [loadingProgress, setLoadingProgress] = useState<JobProgress | null>(null);
   const [status, setStatus] = useState<"upload" | "loading" | "world">("upload");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as SavedProfileResponse;
+      if (saved?.profile) {
+        setProfile(saved.profile);
+        setProfileId(saved.profileId ?? null);
+        setStats(saved.stats ?? null);
+        setSource(saved.source ?? null);
+        setStatus("world");
+      }
+    } catch {
+      // ignore corrupt storage
+    }
+  }, []);
 
   const fileLabel = useMemo(() => {
     if (!files.length) {
@@ -142,48 +164,49 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen px-5 py-6 md:px-10">
-      <section className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl flex-col justify-between gap-10">
+    <main className="min-h-screen px-5 py-8 md:px-10">
+      <section className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl flex-col justify-between gap-10">
+        {/* Nav */}
         <nav className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-lg border border-white/15 bg-white/10">
-              <Compass className="size-5 text-[#e9c46a]" />
+            <div className="grid size-10 place-items-center rounded-2xl bg-[#7ecfbf] text-white shadow-md shadow-[#7ecfbf]/30">
+              <Compass className="size-5" />
             </div>
-            <span className="text-lg font-semibold tracking-wide">Pathfinder</span>
+            <span className="text-lg font-bold tracking-wide text-[#3d3228]">Pathfinder</span>
           </div>
-          <span className="rounded-full border border-white/15 px-3 py-1 text-sm text-white/70">
-            Local MVP
+          <span className="rounded-full border-2 border-[#7ecfbf]/40 bg-white/70 px-3 py-1 text-sm font-medium text-[#7ecfbf]">
+            ✨ Local MVP
           </span>
         </nav>
 
-        <div className="grid items-center gap-8 md:grid-cols-[1.05fr_0.95fr]">
-          <div className="max-w-2xl">
-            <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#2a9d8f]/40 bg-[#2a9d8f]/12 px-3 py-1 text-sm text-[#9be3d9]">
+        {/* Hero */}
+        <div className="grid items-center gap-10 md:grid-cols-[1.1fr_0.9fr]">
+          <div className="max-w-xl">
+            <p className="mb-4 inline-flex items-center gap-2 rounded-full border-2 border-[#7ecfbf]/50 bg-[#d4f2ec] px-4 py-1.5 text-sm font-semibold text-[#4a9d8f]">
               <Sparkles className="size-4" />
               Your chat history, turned into cheer
             </p>
-            <h1 className="text-5xl font-semibold leading-[1.02] md:text-7xl">
+            <h1 className="text-5xl font-bold leading-[1.08] text-[#3d3228] md:text-6xl">
               See the good stuff hiding in your conversations.
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-8 text-white/68">
+            <p className="mt-5 text-lg leading-8 text-[#7a6a5a]">
               Upload a ChatGPT export and Pathfinder turns your recurring interests, strengths,
-              and next steps into a cute, uplifting dashboard with a companion and small wins to
-              chase.
+              and next steps into a cozy, uplifting world to explore 🌿
             </p>
           </div>
 
-          <div className="rounded-lg border border-white/12 bg-black/28 p-5 shadow-2xl shadow-black/40 backdrop-blur">
+          <div className="rounded-3xl border-2 border-[#d4f2ec] bg-white/80 p-6 shadow-xl shadow-[#7ecfbf]/10 backdrop-blur">
             <label
               htmlFor="conversation-upload"
-              className="flex min-h-56 flex-col items-center justify-center gap-4 rounded-md border border-dashed border-white/20 bg-white/[0.04] px-5 text-center transition hover:border-[#e9c46a]/70 hover:bg-white/[0.07]"
+              className="flex min-h-52 cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-[#b4ddd4] bg-[#f0faf8] px-5 text-center transition hover:border-[#7ecfbf] hover:bg-[#e8f8f4]"
             >
-              <div className="grid size-14 place-items-center rounded-lg bg-[#e9c46a] text-black">
+              <div className="grid size-14 place-items-center rounded-2xl bg-[#7ecfbf] text-white shadow-lg shadow-[#7ecfbf]/30">
                 <Upload className="size-7" />
               </div>
               <div>
-                <p className="font-medium">{fileLabel}</p>
-                <p className="mt-2 text-sm text-white/52">
-                  Works with one export file or multiple `conversations-###.json` shards.
+                <p className="font-bold text-[#3d3228]">{fileLabel}</p>
+                <p className="mt-1.5 text-sm text-[#8a9a90]">
+                  conversations.json or sharded conversations-###.json
                 </p>
               </div>
             </label>
@@ -197,26 +220,34 @@ export default function Home() {
             />
 
             {error ? (
-              <p className="mt-4 rounded-md border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+              <p className="mt-4 rounded-2xl border-2 border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-600">
                 {error}
               </p>
             ) : null}
 
             <button
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-md bg-[#f4a261] px-4 py-3 font-semibold text-black transition hover:bg-[#e9c46a]"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#f5c842] px-4 py-3.5 font-bold text-[#3d3228] shadow-md shadow-[#f5c842]/30 transition hover:bg-[#f4b832] disabled:opacity-50"
               onClick={analyze}
               disabled={!files.length}
             >
-              Generate Dashboard
+              Start your journey
               <ArrowRight className="size-5" />
             </button>
           </div>
         </div>
 
-        <div className="grid gap-3 text-sm text-white/55 md:grid-cols-3">
-          <p>1. Parse user-authored messages from ChatGPT mappings.</p>
-          <p>2. Compress large exports into representative analysis chunks.</p>
-          <p>3. Render an encouraging profile with companion, sparkles, and quests.</p>
+        {/* Steps */}
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            { n: "1", t: "Parse", d: "We read your user messages from the ChatGPT export." },
+            { n: "2", t: "Discover", d: "Interests, strengths & forgotten goals are surfaced." },
+            { n: "3", t: "Explore", d: "Your world is built — a cozy map of who you are." },
+          ].map(({ n, t, d }) => (
+            <div key={n} className="rounded-2xl border-2 border-[#d4f2ec] bg-white/60 px-4 py-3">
+              <p className="font-bold text-[#7ecfbf]">{n}. {t}</p>
+              <p className="mt-1 text-sm text-[#7a6a5a]">{d}</p>
+            </div>
+          ))}
         </div>
       </section>
     </main>
@@ -231,29 +262,92 @@ function LoadingScreen({ count, progress }: { count: number; progress: JobProgre
 
   return (
     <main className="grid min-h-screen place-items-center px-5">
-      <section className="w-full max-w-xl rounded-lg border border-white/12 bg-black/35 p-8 text-center">
-        <div className="mx-auto grid size-16 animate-pulse place-items-center rounded-lg bg-[#2a9d8f] text-black">
+      <section className="w-full max-w-md rounded-3xl border-2 border-[#d4f2ec] bg-white/85 p-8 text-center shadow-xl shadow-[#7ecfbf]/10 backdrop-blur">
+        <div className="mx-auto grid size-16 animate-bounce place-items-center rounded-2xl bg-[#7ecfbf] text-white shadow-lg shadow-[#7ecfbf]/30">
           <Map className="size-8" />
         </div>
-        <h1 className="mt-6 text-3xl font-semibold">Building your dashboard</h1>
-        <p className="mt-3 text-white/62">
+        <h1 className="mt-6 text-2xl font-bold text-[#3d3228]">Building your world…</h1>
+        <p className="mt-2 text-[#7a6a5a]">
           {progress?.message ??
-            `Reading ${count} export file${count === 1 ? "" : "s"} and preparing your analysis.`}
+            `Reading ${count} export file${count === 1 ? "" : "s"} and mapping your interests 🌿`}
         </p>
         {totalChunks > 0 ? (
-          <p className="mt-3 font-mono text-sm text-white/45">
+          <p className="mt-2 font-mono text-xs text-[#a09080]">
             {completedChunks}/{totalChunks} chunks · {progress?.phase}
           </p>
         ) : null}
-        <div className="mt-8 h-2 overflow-hidden rounded-full bg-white/10">
+        <div className="mt-6 h-3 overflow-hidden rounded-full bg-[#e8f8f4]">
           <div
-            className="h-full rounded-full bg-[#e9c46a] transition-all duration-500"
+            className="h-full rounded-full bg-[#7ecfbf] transition-all duration-500"
             style={{ width: `${percent}%` }}
           />
         </div>
+        <p className="mt-3 text-xs text-[#b0a090]">{percent}% complete</p>
       </section>
     </main>
   );
+}
+
+const ISLAND_COLORS = ["#e9c46a", "#2a9d8f", "#f4a261", "#8ab17d", "#e76f51"];
+const ISLAND_EMOJIS = ["🎨", "🧭", "🌿", "✨"];
+const ISLAND_POSITIONS: Array<{ lat: number; lng: number }> = [
+  { lat: 35, lng: -30 },
+  { lat: -20, lng: 60 },
+  { lat: 50, lng: 140 },
+  { lat: -40, lng: -100 },
+];
+
+function buildIslands(profile: PathfinderProfile): GlobeMarker[] {
+  const threads = profile.destinyThreads.slice(0, 3);
+  const islands: GlobeMarker[] = threads.map((thread, i) => ({
+    id: `island-${i}`,
+    lat: ISLAND_POSITIONS[i].lat,
+    lng: ISLAND_POSITIONS[i].lng,
+    label: `Island ${i + 1}`,
+    color: ISLAND_COLORS[i],
+    emoji: ISLAND_EMOJIS[i],
+  }));
+  islands.push({
+    id: "discovery",
+    lat: ISLAND_POSITIONS[3].lat,
+    lng: ISLAND_POSITIONS[3].lng,
+    label: "Discovery Pond",
+    color: ISLAND_COLORS[3],
+    emoji: ISLAND_EMOJIS[3],
+  });
+  return islands;
+}
+
+type IslandDetail = {
+  marker: GlobeMarker;
+  title: string;
+  description: string;
+  quests: string[];
+  strengths: string[];
+};
+
+function buildIslandDetail(
+  marker: GlobeMarker,
+  profile: PathfinderProfile,
+  index: number,
+): IslandDetail {
+  if (marker.id === "discovery") {
+    return {
+      marker,
+      title: "Discovery Pond",
+      description:
+        "Hidden interests and forgotten sparks float here, waiting to be rediscovered.",
+      quests: profile.unfinishedBusiness,
+      strengths: profile.reflections.slice(0, 2),
+    };
+  }
+  return {
+    marker,
+    title: `Island ${index + 1}: ${profile.destinyThreads[index]?.split(" ").slice(0, 4).join(" ") ?? ""}`,
+    description: profile.destinyThreads[index] ?? "",
+    quests: profile.quests.slice(index * 1, index * 1 + 2),
+    strengths: profile.strengths.slice(index, index + 1),
+  };
 }
 
 function WorldScreen({
@@ -269,119 +363,273 @@ function WorldScreen({
   source: AnalyzeResponse["source"] | null;
   onReset: () => void;
 }) {
-  return (
-    <main className="min-h-screen px-5 py-6 md:px-8">
-      <section className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-[320px_1fr_360px]">
-        <aside className="rounded-lg border border-white/12 bg-black/30 p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm uppercase tracking-[0.22em] text-[#e9c46a]">Archetype</p>
-              <h1 className="mt-2 text-3xl font-semibold">{profile.archetype}</h1>
-            </div>
-            <button
-              className="grid size-10 place-items-center rounded-md border border-white/12 bg-white/5"
-              onClick={onReset}
-              title="Start over"
-            >
-              <RefreshCcw className="size-4" />
-            </button>
-          </div>
-          <p className="mt-5 leading-7 text-white/66">{profile.summary}</p>
-          {profileId ? (
-            <p className="mt-4 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-xs text-white/48">
-              Profile ID: {profileId}
-            </p>
-          ) : null}
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [completedQuests, setCompletedQuests] = useState<Set<string>>(new Set());
 
-          <div className="mt-6 rounded-md border border-[#2a9d8f]/35 bg-[#2a9d8f]/10 p-4">
+  const islands = useMemo(() => buildIslands(profile), [profile]);
+
+  const selectedIsland = useMemo(() => {
+    if (!selectedId) return null;
+    const marker = islands.find((m) => m.id === selectedId);
+    if (!marker) return null;
+    const index = islands.indexOf(marker);
+    return buildIslandDetail(marker, profile, index);
+  }, [selectedId, islands, profile]);
+
+  function toggleQuest(quest: string) {
+    setCompletedQuests((prev) => {
+      const next = new Set(prev);
+      if (next.has(quest)) next.delete(quest);
+      else next.add(quest);
+      return next;
+    });
+  }
+
+  return (
+    <main className="flex h-screen flex-col overflow-hidden">
+      {/* Top nav */}
+      <nav className="flex shrink-0 items-center justify-between border-b-2 border-[#d4f2ec] bg-white/70 px-6 py-3 backdrop-blur">
+        <div className="flex items-center gap-3">
+          <div className="grid size-9 place-items-center rounded-2xl bg-[#7ecfbf] text-white shadow-md shadow-[#7ecfbf]/25">
+            <Compass className="size-4" />
+          </div>
+          <span className="font-bold text-[#3d3228]">Pathfinder</span>
+          <span className="ml-1 rounded-full border-2 border-[#d4f2ec] bg-[#f0faf8] px-2.5 py-0.5 text-xs font-semibold text-[#5aab9b]">
+            {profile.archetype}
+          </span>
+        </div>
+        <button
+          className="flex items-center gap-1.5 rounded-2xl border-2 border-[#d4f2ec] bg-white px-3 py-1.5 text-sm font-semibold text-[#7a6a5a] transition hover:bg-[#f0faf8]"
+          onClick={onReset}
+        >
+          <RefreshCcw className="size-3.5" />
+          Start over
+        </button>
+      </nav>
+
+      {/* Main layout */}
+      <div className="flex min-h-0 flex-1">
+        {/* Left sidebar */}
+        <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r-2 border-[#d4f2ec] bg-white/50 p-5">
+          {/* Companion card */}
+          <div className="rounded-2xl border-2 border-[#b4ddd4] bg-[#d4f2ec] p-4">
             <div className="flex items-center gap-3">
-              <div className="grid size-12 place-items-center rounded-md bg-[#2a9d8f] text-black">
-                <Shield className="size-6" />
+              <div className="grid size-12 place-items-center rounded-2xl bg-[#7ecfbf] text-2xl shadow-md shadow-[#7ecfbf]/30">
+                🦊
               </div>
               <div>
-                <p className="text-sm text-white/54">Companion</p>
-                <h2 className="font-semibold">{profile.companion.baseType}</h2>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#5aab9b]">Companion</p>
+                <h2 className="font-bold text-[#3d3228]">{profile.companion.baseType}</h2>
               </div>
             </div>
-            <div className="mt-4 space-y-2">
-              {profile.companion.evolutionItems.map((item) => (
-                <p key={item} className="rounded-md bg-black/20 px-3 py-2 text-sm text-white/68">
-                  {item}
+            <p className="mt-3 text-sm leading-6 text-[#5a6e68]">{profile.summary}</p>
+          </div>
+
+          {/* Your Islands */}
+          <div>
+            <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#a09080]">Your Islands</p>
+            <div className="space-y-2">
+              {islands.map((island, i) => {
+                const isActive = selectedId === island.id;
+                const pastelBg: Record<string, string> = {
+                  "island-0": "#fff7d6", "island-1": "#d4f2ec",
+                  "island-2": "#fde8d8", "discovery": "#dff2d0",
+                };
+                const pastelBorder: Record<string, string> = {
+                  "island-0": "#f5c842", "island-1": "#7ecfbf",
+                  "island-2": "#f4a07a", "discovery": "#93c47d",
+                };
+                const bg = pastelBg[island.id] ?? "#fff";
+                const border = pastelBorder[island.id] ?? "#ccc";
+                return (
+                  <button
+                    key={island.id}
+                    onClick={() => setSelectedId(island.id === selectedId ? null : island.id)}
+                    className="flex w-full items-center gap-3 rounded-2xl border-2 px-3 py-2.5 text-left transition"
+                    style={{
+                      borderColor: border,
+                      background: isActive ? bg : "rgba(255,255,255,0.6)",
+                      boxShadow: isActive ? `0 4px 14px ${border}44` : "none",
+                    }}
+                  >
+                    <span className="text-xl">{island.emoji}</span>
+                    <p className="text-sm font-semibold" style={{ color: isActive ? "#3d3228" : "#7a6a5a" }}>
+                      {island.id === "discovery"
+                        ? "Discovery Pond"
+                        : profile.destinyThreads[i]?.split(" ").slice(0, 5).join(" ") ?? `Island ${i + 1}`}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Strengths */}
+          <div className="rounded-2xl border-2 border-[#fef6cc] bg-[#fffdf0] p-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#c4a020]">
+              <Sparkles className="size-3.5" /> Strengths
+            </p>
+            <div className="space-y-2">
+              {profile.strengths.map((s) => (
+                <p key={s} className="text-sm leading-5 text-[#6a5a3a]">{s}</p>
+              ))}
+            </div>
+          </div>
+
+          {stats && (
+            <dl className="grid grid-cols-2 gap-2 text-center">
+              <Stat label="Messages" value={stats.messages} />
+              <Stat label={source === "gemini" ? "Gemini ✓" : "Mock"} value={stats.chunkCount + " chunks"} />
+            </dl>
+          )}
+        </aside>
+
+        {/* Globe center */}
+        <div className="relative min-w-0 flex-1">
+          <Suspense
+            fallback={
+              <div className="grid h-full place-items-center">
+                <div className="animate-pulse text-[#7ecfbf]">Loading world… 🌿</div>
+              </div>
+            }
+          >
+            <GlobeView markers={islands} selectedId={selectedId} onSelect={setSelectedId} />
+          </Suspense>
+
+          {/* Forgotten projects chip */}
+          <button
+            onClick={() => setSelectedId(selectedId === "discovery" ? null : "discovery")}
+            className="absolute bottom-6 left-6 flex items-center gap-2 rounded-2xl border-2 border-[#93c47d] bg-white/90 px-4 py-2.5 text-sm font-bold text-[#5a8a4a] shadow-lg shadow-[#93c47d]/20 backdrop-blur transition hover:bg-[#dff2d0]"
+          >
+            <Anchor className="size-4" />
+            Forgotten Projects
+          </button>
+
+          {!selectedId && (
+            <p className="absolute bottom-6 right-6 text-xs font-medium text-[#a09080]">
+              Click a marker to explore ✨
+            </p>
+          )}
+        </div>
+
+        {/* Right panel */}
+        <aside className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-l-2 border-[#d4f2ec] bg-white/50 p-5">
+          {selectedIsland ? (
+            <>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-[#a09080]">
+                    {selectedIsland.marker.emoji} Island
+                  </p>
+                  <h2 className="mt-1 text-xl font-bold leading-tight text-[#3d3228]">
+                    {selectedIsland.title}
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setSelectedId(null)}
+                  className="mt-1 grid size-7 shrink-0 place-items-center rounded-xl border-2 border-[#e0d8d0] bg-white text-[#a09080] transition hover:bg-[#f0e8e0]"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+
+              <p className="text-sm leading-6 text-[#7a6a5a]">{selectedIsland.description}</p>
+
+              {selectedIsland.quests.length > 0 && (
+                <div>
+                  <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#d4805a]">
+                    <Swords className="size-3.5" /> Quests
+                  </p>
+                  <div className="space-y-2">
+                    {selectedIsland.quests.map((quest) => (
+                      <label
+                        key={quest}
+                        className="flex cursor-pointer gap-3 rounded-2xl border-2 border-[#fde8d8] bg-[#fff8f4] p-3 transition hover:border-[#f4a07a]"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 size-4 shrink-0 accent-[#7ecfbf]"
+                          checked={completedQuests.has(quest)}
+                          onChange={() => toggleQuest(quest)}
+                        />
+                        <span className="text-sm leading-5 text-[#6a5a4a]">{quest}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedIsland.strengths.length > 0 && (
+                <div className="rounded-2xl border-2 border-[#d4f2ec] bg-[#f0faf8] p-4">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-[#5aab9b]">
+                    Reflection
+                  </p>
+                  {selectedIsland.strengths.map((s) => (
+                    <p key={s} className="text-sm leading-6 text-[#5a6e68]">{s}</p>
+                  ))}
+                </div>
+              )}
+
+              <div className="rounded-2xl border-2 border-[#fef6cc] bg-[#fffdf0] p-4">
+                <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#c4a020]">
+                  <Star className="size-3.5" /> Companion Rewards
                 </p>
-              ))}
-            </div>
-          </div>
+                <div className="space-y-1.5">
+                  {profile.companion.evolutionItems.map((item) => (
+                    <p key={item} className="text-sm leading-5 text-[#7a6a3a]">{item}</p>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#d4805a]">
+                  <Swords className="mr-1 inline size-3.5" /> All Quests
+                </p>
+                <h2 className="mt-1 text-xl font-bold text-[#3d3228]">Small wins to try</h2>
+              </div>
+              <div className="space-y-2">
+                {profile.quests.map((quest, index) => (
+                  <label
+                    key={quest}
+                    className="flex cursor-pointer gap-3 rounded-2xl border-2 border-[#fde8d8] bg-[#fff8f4] p-3 transition hover:border-[#f4a07a]"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-4 shrink-0 accent-[#7ecfbf]"
+                      checked={completedQuests.has(quest)}
+                      onChange={() => toggleQuest(quest)}
+                    />
+                    <span>
+                      <span className="block text-xs font-bold text-[#c4a060]">Quest {index + 1}</span>
+                      <span className="text-sm leading-5 text-[#6a5a4a]">{quest}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
 
-          <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
-            <Stat label="Messages" value={stats?.messages ?? 0} />
-            <Stat label="Chunks" value={stats?.chunkCount ?? 0} />
-            <Stat label="Mode" value={source === "gemini" ? "Gemini" : "Mock"} />
-          </dl>
+              <div className="rounded-2xl border-2 border-[#fef6cc] bg-[#fffdf0] p-4">
+                <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#c4a020]">
+                  <Trophy className="size-3.5" /> Destiny Threads
+                </p>
+                {profile.destinyThreads.map((t) => (
+                  <p key={t} className="mb-2 text-sm leading-5 text-[#7a6a3a]">{t}</p>
+                ))}
+              </div>
+            </>
+          )}
         </aside>
-
-        <section className="min-h-[720px] rounded-lg border border-white/12 bg-[linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))] p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm uppercase tracking-[0.22em] text-white/48">Sparkle Board</p>
-              <h2 className="mt-1 text-2xl font-semibold">Things worth celebrating</h2>
-            </div>
-            <div className="rounded-full border border-white/12 px-3 py-1 text-sm text-white/58">
-              {profile.reflections.length} highlights
-            </div>
-          </div>
-
-          <div className="relative mt-6 min-h-[610px] overflow-hidden rounded-md border border-white/10 bg-[#10141a]">
-            <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:42px_42px]" />
-            <div className="relative grid gap-5 p-5 md:grid-cols-2">
-              {profile.reflections.map((reflection, index) => (
-                <MapNode key={reflection} index={index} text={reflection} />
-              ))}
-              <Panel title="Your Strengths" icon={<Sparkles className="size-4" />} items={profile.strengths} />
-              <Panel title="Destiny Threads" icon={<Trophy className="size-4" />} items={profile.destinyThreads} />
-            </div>
-          </div>
-        </section>
-
-        <aside className="rounded-lg border border-white/12 bg-black/30 p-5">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-md bg-[#e76f51] text-black">
-              <Swords className="size-5" />
-            </div>
-            <div>
-              <p className="text-sm uppercase tracking-[0.22em] text-[#f4a261]">Quest Panel</p>
-              <h2 className="text-xl font-semibold">Small wins to try</h2>
-            </div>
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {profile.quests.map((quest, index) => (
-              <label
-                key={quest}
-                className="flex gap-3 rounded-md border border-white/10 bg-white/[0.04] p-4 transition hover:border-[#e9c46a]/45"
-              >
-                <input className="mt-1 size-4 accent-[#2a9d8f]" type="checkbox" />
-                <span>
-                  <span className="block font-medium">Quest {index + 1}</span>
-                  <span className="mt-1 block text-sm leading-6 text-white/62">{quest}</span>
-                </span>
-              </label>
-            ))}
-          </div>
-
-          <div className="mt-5">
-            <Panel title="Gentle Nudges" icon={<FileJson className="size-4" />} items={profile.unfinishedBusiness} />
-          </div>
-        </aside>
-      </section>
+      </div>
     </main>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
-      <dt className="text-xs text-white/45">{label}</dt>
-      <dd className="mt-1 font-mono text-sm">{value}</dd>
+    <div className="rounded-2xl border-2 border-[#d4f2ec] bg-white/70 p-3">
+      <dt className="text-xs font-semibold text-[#a09080]">{label}</dt>
+      <dd className="mt-1 font-mono text-sm font-bold text-[#3d3228]">{value}</dd>
     </div>
   );
 }

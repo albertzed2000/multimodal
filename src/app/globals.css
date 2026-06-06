@@ -1,48 +1,52 @@
 @import "tailwindcss";
 
 :root {
-  --background: #080a0f;
-  --foreground: #f5f1e8;
-  --muted: #9da4b2;
-  --line: rgba(245, 241, 232, 0.14);
+  --bg: #f0ece4;
+  --surface: #fffdf8;
+  --surface2: #fff8ee;
+  --border: rgba(180,160,130,0.28);
+  --text: #3d3228;
+  --text-muted: #8a7a6a;
+
+  --mint: #7ecfbf;
+  --mint-light: #d4f2ec;
+  --peach: #f4a07a;
+  --peach-light: #fde8d8;
+  --yellow: #f5c842;
+  --yellow-light: #fef6cc;
+  --lavender: #b8a4e0;
+  --lavender-light: #ede8f8;
+  --sage: #93c47d;
+  --sage-light: #dff2d0;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(circle at 15% 10%, rgba(42, 157, 143, 0.2), transparent 26rem),
-    radial-gradient(circle at 85% 15%, rgba(231, 111, 81, 0.17), transparent 24rem),
-    linear-gradient(135deg, #080a0f 0%, #12151d 48%, #17120d 100%);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    radial-gradient(ellipse at 10% 0%, #d8f4ef 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 5%, #f8e4f0 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 100%, #fef0d8 0%, transparent 55%),
+    #f0ece4;
+  color: var(--text);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
-button,
-input {
-  font: inherit;
-}
+button, input { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.55; }
+::selection { background: rgba(124, 207, 191, 0.35); }
 
-button {
-  cursor: pointer;
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-::selection {
-  background: rgba(233, 196, 106, 0.35);
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(180,160,130,0.3); border-radius: 99px; }
